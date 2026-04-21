@@ -1,0 +1,766 @@
+﻿/* ============================================================
+   Cisco Design System 2024
+   Primary   #049fd9  (Digital Blue)
+   Navy      #0d274d
+   Green     #6ebe4a
+   Red       #e2231a
+   Light bg  #f4f7fa
+   ============================================================ */
+
+:root {
+  --blue:   #049fd9;
+  --navy:   #0d274d;
+  --dark:   #1b2a32;
+  --green:  #6ebe4a;
+  --red:    #e2231a;
+  --orange: #f78f1e;
+  --bg:     #f4f7fa;
+  --card:   #ffffff;
+  --border: #dde3ea;
+  --text:   #1d1d1d;
+  --muted:  #5b6b7c;
+  --ring:   rgba(4,159,217,0.3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  font-size: 14px;
+}
+
+/* ── Topbar ─────────────────────────────────── */
+.topbar {
+  background: var(--navy);
+  border-bottom: 3px solid var(--blue);
+}
+.topbar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.cisco-logo {
+  width: 90px;
+  height: 34px;
+  flex-shrink: 0;
+}
+.topbar-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.topbar-product {
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.topbar-sub {
+  color: #8ab4d4;
+  font-size: 0.75rem;
+}
+
+/* ── Page layout ─────────────────────────────── */
+main {
+  width: 100%;
+  padding: 0;
+}
+
+/* ── Layout grille générique (AXL) ──────────── */
+.page-grid {
+  display: flex;
+  gap: 0;
+  align-items: start;
+}
+  grid-template-columns: 300px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .page-grid { flex-direction: column; }
+}
+
+/* ── Sidebar générique ───────────────────────── */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;  width: 300px;
+  flex-shrink: 0;}
+
+/* ══ Onglet Contrôleur — layout plein écran, zéro marge ══ */
+#tab-controller.active {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 105px); /* topbar(60) + tabbar(44) + 1px border */
+  min-height: 500px;
+  padding: 0;
+}
+
+/* Bandeau téléphone actif */
+.ctrl-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-radius: 0;
+  padding: 10px 16px;
+  margin-bottom: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+.ctrl-banner .active-phone-bar { flex: 0 0 auto; }
+.ctrl-banner .status { flex: 1; margin: 0; min-height: 0; }
+.ctrl-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.ctrl-banner-actions button { width: auto; }
+
+/* Corps 2 colonnes */
+.ctrl-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 0;
+}
+
+/* Col 1 : Commandes + Journal */
+.ctrl-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+.ctrl-left .log-card {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ctrl-left .log-card .log {
+  flex: 1;
+  max-height: none;
+  overflow-y: auto;
+}
+
+/* Col 2 : Écran + Softkeys */
+.ctrl-screen-col {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0;
+  padding: 12px;
+  box-shadow: none;
+  gap: 8px;
+  min-height: 0;
+  min-width: 200px;
+  flex-shrink: 0;
+}
+.ctrl-screen-col .screenshot-box {
+  flex: 1;
+  min-height: 0;
+}
+.ctrl-screen-col #screenshot {
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Col 2 : Commandes + Touches + SSH + Log */
+.ctrl-controls-col {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0;
+  padding: 14px 18px;
+  box-shadow: none;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Commandes compactes en haut de la col droite */
+.commands-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.cmd-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.cmd-row input {
+  flex: 1;
+  min-width: 0;
+}
+.cmd-row button {
+  width: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.cmd-row textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  resize: vertical;
+}
+
+/* ── Section SSH ─────────────────────────────── */
+.ssh-section {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+.ssh-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.btn-ssh-preset {
+  width: 100% !important;
+  padding: 5px 6px;
+  font-size: 0.73rem;
+  background: #3a4a5c;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.btn-ssh-preset:hover  { filter: brightness(1.2); }
+.btn-ssh-preset:active { transform: scale(0.96); }
+.ssh-custom-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.ssh-custom-row input  { flex: 1; min-width: 0; }
+.ssh-custom-row button { width: auto; flex-shrink: 0; }
+.ssh-output {
+  background: #0d1117;
+  color: #58a6ff;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+  font-size: 0.75rem;
+  line-height: 1.55;
+  margin: 0;
+  white-space: pre-wrap;
+  min-height: 32px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+/* ── Journal (bas col droite) ────────────────── */
+.ctrl-log-section {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+.ctrl-log-section .log {
+  max-height: 140px;
+}
+
+/* ── Cards ───────────────────────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.card h2 {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* ── Form elements ───────────────────────────── */
+.field {
+  margin-bottom: 10px;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.field-btn {
+  min-width: 0;
+}
+
+label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: var(--text);
+  background: #fafbfc;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--ring);
+  background: #fff;
+}
+textarea { min-height: 80px; resize: vertical; }
+
+button {
+  width: 100%;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  background: var(--blue);
+  color: #fff;
+  transition: filter 120ms, transform 80ms;
+  white-space: nowrap;
+}
+button:hover  { filter: brightness(1.08); }
+button:active { transform: scale(0.97); }
+
+.btn-outline {
+  background: transparent;
+  border: 1.5px solid var(--blue);
+  color: var(--blue);
+}
+.btn-outline:hover { background: rgba(4,159,217,0.08); }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.btn-ghost:hover { background: var(--bg); }
+
+.btn-green {
+  background: var(--green);
+  color: #fff;
+}
+
+/* ── Credentials section ─────────────────────── */
+.cred-section {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blue);
+  border-radius: 6px;
+  padding: 10px 12px 8px;
+  margin-bottom: 10px;
+}
+.cred-label {
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--blue);
+  margin-bottom: 8px;
+}
+
+/* ── Status ──────────────────────────────────── */
+.status {
+  margin: 6px 0;
+  min-height: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.status.ok  { color: #1e7e34; background: #d4edda; }
+.status.err { color: #721c24; background: #f8d7da; }
+
+/* ── Active button highlight ─────────────────── */
+.active-btn {
+  background: var(--navy) !important;
+  border-color: var(--blue) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 2px var(--blue);
+}
+
+/* ── Log ─────────────────────────────────────── */
+.log-card { flex: 1; }
+.log {
+  background: #0d1117;
+  color: #58a6ff;
+  border-radius: 6px;
+  padding: 10px 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Screenshot box ──────────────────────────── */
+.screenshot-box {
+  background: #0d1117;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.screenshot-msg {
+  color: #444d56;
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 16px;
+  margin: 0;
+}
+
+/* Softkeys collées sous l'écran */
+.softkey-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+.softkey-bar .kbtn {
+  width: 100% !important;
+  border-radius: 6px;
+}
+
+/* ── Controls card (legacy) ─────────────────── */
+.controls-card { padding: 14px 18px; }
+.ctrl-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* ── Keyboard groups ─────────────────────────── */
+.kpad-group { flex: 0 0 auto; }
+
+.kpad-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.kpad-hint {
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+.kpad-row {
+  display: flex;
+  gap: 5px;
+}
+.kpad-row.wrap { flex-wrap: wrap; }
+
+/* ── Keyboard buttons ────────────────────────── */
+.kbtn {
+  width: auto !important;
+  min-width: 42px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  transition: filter 100ms, transform 80ms;
+  white-space: nowrap;
+}
+.kbtn:hover  { filter: brightness(1.15); transform: translateY(-1px); }
+.kbtn:active { transform: scale(0.95); }
+
+/* Colour scheme — Cisco palette */
+.ksoft   { background: var(--blue); }
+.knav    { background: var(--dark); }
+.ksel    { background: var(--navy); }
+.kdanger { background: var(--red); }
+.kaudio  { background: #2d6a9f; }
+.kapp    { background: #3a4a5c; }
+.knum    { background: var(--dark); font-size: 0.9rem; min-width: 46px; }
+.kline   { background: var(--green); color: #fff; }
+
+/* Navigation cross */
+.kpad-nav {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 38px);
+  gap: 4px;
+}
+.kpad-nav .kbtn {
+  min-width: unset;
+  width: 44px !important;
+  height: 38px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+/* Numeric 3-col grid */
+.kpad-numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  gap: 5px;
+}
+.kpad-numpad .kbtn {
+  width: 46px !important;
+  height: 42px;
+  padding: 4px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+
+/* ── Onglets ─────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 0;
+  padding: 0 20px;
+}
+.tab-btn {
+  padding: 9px 22px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  font-family: inherit;
+  margin-bottom: -2px;
+  transition: color 120ms;
+}
+.tab-btn:hover  { color: var(--blue); filter: none; }
+.tab-btn:active { transform: none; }
+.tab-btn.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+.tab-pane         { display: none; }
+.tab-pane.active  { display: block; }
+
+/* Onglet AXL : padding classique */
+#tab-axl.active   { padding: 18px 20px 32px; }
+
+/* ── Panneau AXL ─────────────────────────────── */
+.axl-grid { }
+.axl-panel { min-width: 0; flex: 1; }
+
+.btn-blue {
+  background: var(--blue);
+  color: #fff;
+}
+
+.axl-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.axl-sep-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axl-sep-toggle input { cursor: pointer; accent-color: var(--blue); }
+.axl-table-wrap {
+  overflow-x: auto;
+  margin-top: 4px;
+}
+.axl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+.axl-table th {
+  background: #f0f5fa;
+  color: var(--navy);
+  font-weight: 700;
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+.axl-search-row th {
+  padding: 4px 6px;
+  background: #f7fafd;
+  border-bottom: 1px solid var(--border);
+}
+.axl-search {
+  width: 100%;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  background: #fff;
+  outline: none;
+}
+.axl-search:focus { border-color: var(--blue); box-shadow: 0 0 0 2px var(--ring); }
+.axl-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.axl-table tr:hover td { background: #f7fbff; }
+.axl-mono { font-family: Consolas, monospace; font-size: 0.82rem; color: var(--navy); }
+.axl-empty { text-align: center; color: var(--muted); padding: 30px !important; }
+
+/* ── Badges statut REG/UNREG ─────────────────── */
+.axl-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.axl-badge-reg     { background: #d4edda; color: #1e7e34; }
+.axl-badge-unreg   { background: #f8d7da; color: #721c24; }
+.axl-badge-unknown { background: #e9ecef; color: #6c757d; }
+
+/* ── Barre téléphone actif ───────────────────── */
+
+.active-phone-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.active-phone-icon { font-size: 1.4rem; flex-shrink: 0; }
+
+.active-phone-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.active-phone-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--navy);
+  font-family: Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.active-phone-ip {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.btn-control {
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-control:hover  { filter: brightness(1.1); }
+.btn-control:active { transform: scale(0.97); }
+
+.btn-assign {
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-assign:hover  { filter: brightness(1.1); }
+.btn-assign:active { transform: scale(0.97); }
+.btn-assign:disabled { opacity: 0.6; cursor: not-allowed; transform: none; filter: none; }
+.btn-assigned {
+  background: var(--green) !important;
+  cursor: default;
+}
+
+/* ── Splitters redimensionnables ─────────────── */
+.h-splitter {
+  width: 6px;
+  flex-shrink: 0;
+  background: var(--border);
+  cursor: col-resize;
+  position: relative;
+  transition: background 120ms;
+  z-index: 10;
+  align-self: stretch;
+}
+.h-splitter:hover,
+.h-splitter.dragging { background: var(--blue); }
+.h-splitter::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 32px;
+  background: currentColor;
+  opacity: 0.25;
+  border-radius: 2px;
+}
+

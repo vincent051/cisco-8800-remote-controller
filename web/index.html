@@ -1,0 +1,340 @@
+﻿<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cisco 8800 Remote Controller</title>
+    <link rel="stylesheet" href="/styles.css?v=7" />
+  </head>
+  <body>
+
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-brand">
+          <svg class="cisco-logo" viewBox="0 0 90 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0"  y="12" width="6" height="10" rx="2" fill="#049fd9"/>
+            <rect x="9"  y="6"  width="6" height="22" rx="2" fill="#049fd9"/>
+            <rect x="18" y="2"  width="6" height="30" rx="2" fill="#049fd9"/>
+            <rect x="27" y="6"  width="6" height="22" rx="2" fill="#049fd9"/>
+            <rect x="36" y="12" width="6" height="10" rx="2" fill="#049fd9"/>
+            <text x="50" y="24" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#ffffff" letter-spacing="1">CISCO</text>
+          </svg>
+        </div>
+        <div class="topbar-title">
+          <span class="topbar-product">IP Phone Remote Controller</span>
+          <span class="topbar-sub">Cisco 8800 Series — 8841 · 8845 · 8851 · 8861 · 8865</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+
+      <!-- ── Barre d'onglets ── -->
+      <div class="tab-bar">
+        <button class="tab-btn" data-tab="tab-controller">🎮 Contrôleur</button>
+        <button class="tab-btn active" data-tab="tab-axl">🏢 CUCM AXL</button>
+      </div>
+
+      <!-- ══ Onglet 1 : Contrôleur ══ -->
+      <div id="tab-controller" class="tab-pane">
+
+        <!-- Champs cachés IP/credentials -->
+        <input type="hidden" id="targetIp" />
+        <input type="hidden" id="username" />
+        <input type="hidden" id="password" />
+        <select id="phoneList" style="display:none"></select>
+
+        <!-- ── Bandeau téléphone actif ── -->
+        <div class="ctrl-banner">
+          <div class="active-phone-bar" id="activePhoneBar">
+            <span class="active-phone-icon">📵</span>
+            <div class="active-phone-info">
+              <span id="activePhoneName" class="active-phone-name">Aucun téléphone actif</span>
+              <span id="activePhoneIp" class="active-phone-ip"></span>
+            </div>
+          </div>
+          <p class="status" id="status"></p>
+          <div class="ctrl-banner-actions">
+            <button type="button" id="btnScreenshot">📷 Capturer</button>
+            <button type="button" id="btnAutoRefresh" class="btn-outline">Auto-refresh : OFF</button>
+            <button type="button" id="btnRefreshNow" class="btn-ghost">↺ Rafraîchir</button>
+          </div>
+        </div>
+
+        <!-- ── Corps 2 colonnes ── -->
+        <div class="ctrl-body">
+
+          <!-- Col 1 : Écran + Softkeys -->
+          <section class="ctrl-screen-col" id="ctrlScreenCol">
+            <div class="screenshot-box">
+              <img id="screenshot" alt="Écran du téléphone" />
+              <p id="screenshotError" class="screenshot-msg">Cliquer sur "Capturer" pour afficher.</p>
+            </div>
+            <div class="softkey-bar">
+              <button type="button" data-key="Soft1" class="kbtn ksoft">SK 1</button>
+              <button type="button" data-key="Soft2" class="kbtn ksoft">SK 2</button>
+              <button type="button" data-key="Soft3" class="kbtn ksoft">SK 3</button>
+              <button type="button" data-key="Soft4" class="kbtn ksoft">SK 4</button>
+            </div>
+          </section>
+
+          <!-- Séparateur redimensionnable -->
+          <div class="h-splitter" id="splitterCtrl"></div>
+
+          <!-- Col 2 : Commandes + Touches + SSH + Journal -->
+          <section class="ctrl-controls-col" id="ctrlControlsCol">
+
+            <!-- Commandes rapides -->
+            <div class="commands-inline">
+              <div class="cmd-row">
+                <input id="keyInput" type="text" placeholder="Touche (ex: Speaker)" value="Speaker" />
+                <button type="button" id="btnKey">Envoyer</button>
+              </div>
+              <div class="cmd-row">
+                <input id="dialInput" type="text" placeholder="Composer un numéro..." />
+                <button type="button" id="btnDial" class="btn-green">Composer</button>
+              </div>
+              <div class="cmd-row">
+                <textarea id="customXml" placeholder="<CiscoIPPhoneExecute>...</CiscoIPPhoneExecute>"></textarea>
+                <button type="button" id="btnXml" class="btn-ghost">XML</button>
+              </div>
+            </div>
+
+            <!-- Navigation · Audio · Appel · Apps -->
+            <div class="ctrl-row">
+
+              <div class="kpad-group">
+                <div class="kpad-title">Navigation</div>
+                <div class="kpad-nav">
+                  <span></span>
+                  <button type="button" data-key="NavUp"     class="kbtn knav">▲</button>
+                  <span></span>
+                  <button type="button" data-key="NavLft"    class="kbtn knav">◀</button>
+                  <button type="button" data-key="Select"    class="kbtn knav ksel">OK</button>
+                  <button type="button" data-key="NavRgt"    class="kbtn knav">▶</button>
+                  <span></span>
+                  <button type="button" data-key="NavDwn"    class="kbtn knav">▼</button>
+                  <span></span>
+                </div>
+              </div>
+
+              <div class="kpad-group">
+                <div class="kpad-title">Audio</div>
+                <div class="kpad-row wrap">
+                  <button type="button" data-key="Speaker" class="kbtn kaudio">🔊 Speaker</button>
+                  <button type="button" data-key="Headset" class="kbtn kaudio">🎧 Headset</button>
+                  <button type="button" data-key="Mute"    class="kbtn kaudio">🔇 Mute</button>
+                  <button type="button" data-key="VolUp"   class="kbtn kaudio">Vol +</button>
+                  <button type="button" data-key="VolDwn"  class="kbtn kaudio">Vol −</button>
+                </div>
+              </div>
+
+              <div class="kpad-group">
+                <div class="kpad-title">Appel</div>
+                <div class="kpad-row wrap">
+                  <button type="button" data-key="Hangup"  class="kbtn kdanger">📵 End Call</button>
+                </div>
+                <p class="kpad-hint">Hold · Transfer · Confrn<br>= SK 1–4</p>
+              </div>
+
+              <div class="kpad-group">
+                <div class="kpad-title">Applications</div>
+                <div class="kpad-row wrap">
+                  <button type="button" data-key="Messages"     class="kbtn kapp">Messages</button>
+                  <button type="button" data-key="Directories"  class="kbtn kapp">Répert.</button>
+                  <button type="button" data-key="Applications" class="kbtn kapp">Applis</button>
+                  <button type="button" data-key="Services"     class="kbtn kapp">Services</button>
+                  <button type="button" data-key="Back"         class="kbtn kapp">⌫ Back</button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Pavé numérique · Lignes -->
+            <div class="ctrl-row" style="margin-top:14px">
+
+              <div class="kpad-group">
+                <div class="kpad-title">Pavé numérique</div>
+                <div class="kpad-numpad">
+                  <button type="button" data-key="1"     class="kbtn knum">1</button>
+                  <button type="button" data-key="2"     class="kbtn knum">2</button>
+                  <button type="button" data-key="3"     class="kbtn knum">3</button>
+                  <button type="button" data-key="4"     class="kbtn knum">4</button>
+                  <button type="button" data-key="5"     class="kbtn knum">5</button>
+                  <button type="button" data-key="6"     class="kbtn knum">6</button>
+                  <button type="button" data-key="7"     class="kbtn knum">7</button>
+                  <button type="button" data-key="8"     class="kbtn knum">8</button>
+                  <button type="button" data-key="9"     class="kbtn knum">9</button>
+                  <button type="button" data-key="*"     class="kbtn knum">*</button>
+                  <button type="button" data-key="0"     class="kbtn knum">0</button>
+                  <button type="button" data-key="#"     class="kbtn knum">#</button>
+                </div>
+              </div>
+
+              <div class="kpad-group">
+                <div class="kpad-title">Lignes</div>
+                <div class="kpad-row wrap">
+                  <button type="button" data-key="Line1" class="kbtn kline">Ligne 1</button>
+                  <button type="button" data-key="Line2" class="kbtn kline">Ligne 2</button>
+                  <button type="button" data-key="Line3" class="kbtn kline">Ligne 3</button>
+                  <button type="button" data-key="Line4" class="kbtn kline">Ligne 4</button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- SSH Diagnostics -->
+            <div class="ssh-section">
+              <div class="kpad-title">SSH Diagnostics</div>
+              <div class="ssh-presets">
+                <button type="button" class="btn-ssh-preset" data-cmd="show version">Version</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="show config network">Réseau</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="show status">Statut</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="show dhcp">DHCP</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="show security">Sécurité</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="show hosts">Hosts</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="show config security">ITL</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="show call-history">Call History</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="erase all settings">Erase All Settings</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="erase network configuration">Erase Network Configuration</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="erase ctl">Erase CTL</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="reset hard">Reset Hard</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="reset factory">Reset Factory</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="reset soft">Reset Soft</button>
+                <button type="button" class="btn-ssh-preset" data-cmd="uptime">Uptime</button>
+              </div>
+              <div class="ssh-custom-row">
+                <input id="sshCommand" type="text" placeholder="Commande SSH personnalisée..." />
+                <button type="button" id="btnSsh">Exécuter</button>
+              </div>
+              <pre id="sshOutput" class="ssh-output"></pre>
+            </div>
+
+            <!-- Journal -->
+            <div class="ctrl-log-section">
+              <div class="kpad-title">Journal</div>
+              <pre class="log" id="log"></pre>
+            </div>
+
+          </section>
+
+        </div>
+      </div><!-- fin tab-controller -->
+
+      <!-- ══ Onglet 2 : CUCM AXL ══ -->
+      <div id="tab-axl" class="tab-pane active">
+        <div class="page-grid axl-grid">
+
+          <!-- Sidebar AXL -->
+          <aside class="sidebar" id="axlSidebar">
+            <article class="card">
+              <h2>Connexion CUCM</h2>
+              <div class="field">
+                <label for="axlCucm">IP / FQDN CUCM</label>
+                <input id="axlCucm" type="text" placeholder="172.27.199.111" />
+              </div>
+              <div class="field">
+                <label for="axlUser">Utilisateur AXL</label>
+                <input id="axlUser" type="text" value="phonecontrole" />
+              </div>
+              <div class="field">
+                <label for="axlPass">Mot de passe</label>
+                <input id="axlPass" type="password" value="phonecontrole" />
+              </div>
+              <div class="field">
+                <label for="axlUserType">Type d'utilisateur</label>
+                <select id="axlUserType">
+                  <option value="app" selected>Application User</option>
+                  <option value="end">End User</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="axlCtrlUser" id="axlCtrlUserLabel">Application User (userId)</label>
+                <input id="axlCtrlUser" type="text" value="phonecontrole" placeholder="ex: phonecontrole" />
+              </div>
+              <div class="field">
+                <label for="axlPhoneHttpUser">HTTP User (screenshot / web téléphone)</label>
+                <input id="axlPhoneHttpUser" type="text" value="phonecontrole" placeholder="ex: phonecontrole" />
+              </div>
+              <div class="field">
+                <label for="axlPhoneHttpPass">HTTP Password (screenshot / web téléphone)</label>
+                <input id="axlPhoneHttpPass" type="password" value="phonecontrole" />
+              </div>
+              <div class="field">
+                <label for="axlPhoneSshUser">SSH User (Secure Shell téléphone)</label>
+                <input id="axlPhoneSshUser" type="text" value="post" placeholder="ex: post" />
+              </div>
+              <div class="field">
+                <label for="axlPhoneSshPass">SSH Password (Secure Shell téléphone)</label>
+                <input id="axlPhoneSshPass" type="password" value="postpost" />
+              </div>
+              <div class="field">
+                <label for="axlVersion">Version AXL</label>
+                <select id="axlVersion">
+                  <option value="auto" selected>Auto-detect</option>
+                  <option value="15.0">15.0</option>
+                  <option value="14.0">14.0</option>
+                  <option value="12.5">12.5</option>
+                  <option value="12.0">12.0</option>
+                  <option value="11.5">11.5</option>
+                  <option value="11.0">11.0</option>
+                  <option value="10.5">10.5</option>
+                  <option value="10.0">10.0</option>
+                </select>
+              </div>
+              <button type="button" id="btnAxlList" class="btn-blue" style="width:100%;margin-top:8px">🔍 Lister les téléphones</button>
+              <p class="status" id="axlStatus"></p>
+            </article>
+          </aside>
+
+          <!-- Séparateur redimensionnable -->
+          <div class="h-splitter" id="splitterAxl"></div>
+
+          <!-- Table des phones AXL -->
+          <section class="axl-panel" id="axlPanel">
+            <article class="card" style="min-height:300px">
+              <div class="axl-toolbar">
+                <h2 style="margin:0">Téléphones CUCM <span id="axlCount" style="font-weight:400;color:var(--muted);font-size:0.85rem"></span></h2>
+                <label class="axl-sep-toggle">
+                  <input type="checkbox" id="axlFilterSep" checked>
+                  Uniquement SEP
+                </label>
+              </div>
+              <div class="axl-table-wrap">
+                <table class="axl-table" id="axlTable">
+                  <thead>
+                    <tr>
+                      <th>Nom (MAC)</th>
+                      <th>Description</th>
+                      <th>Modèle</th>
+                      <th>Pool</th>
+                      <th>IP</th>
+                      <th>Statut</th>
+                      <th>Action</th>
+                    </tr>
+                    <tr class="axl-search-row">
+                      <th><input type="search" class="axl-search" data-col="0" placeholder="Filtrer…"></th>
+                      <th><input type="search" class="axl-search" data-col="1" placeholder="Filtrer…"></th>
+                      <th><input type="search" class="axl-search" data-col="2" placeholder="Filtrer…"></th>
+                      <th><input type="search" class="axl-search" data-col="3" placeholder="Filtrer…"></th>
+                      <th><input type="search" class="axl-search" data-col="4" placeholder="Filtrer…"></th>
+                      <th></th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="axlTableBody">
+                    <tr><td colspan="7" class="axl-empty">Cliquer sur "Lister les téléphones" pour charger.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+        </div>
+      </div><!-- fin tab-axl -->
+
+    </main>
+
+    <script src="/app.js?v=23" defer></script>
+  </body>
+</html>

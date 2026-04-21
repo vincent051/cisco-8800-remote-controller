@@ -1,0 +1,12 @@
+phones.json
+
+# Fichiers temporaires et de debug
+$env:TEMP/axl_*.txt
+*.tmp
+
+# Logs PowerShell
+*.log
+
+# Installateurs téléchargés
+*-installer.exe
+

@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Accueil",
+    "sep": "SEP001122334455",
+    "ip": "192.168.1.50",
+    "description": "Cisco 8845 - Reception",
+    "username": "admin",
+    "password": "admin",
+    "sshUser": "post",
+    "sshPass": "postpost",
+    "sshHostKey": "",
+    "consoleUser": "debug",
+    "consolePass": "debug"
+  },
+  {
+    "name": "Bureau 1",
+    "sep": "SEP001122334466",
+    "ip": "192.168.1.51",
+    "description": "Cisco 8865 - Open space",
+    "username": "admin",
+    "password": "admin",
+    "sshUser": "post",
+    "sshPass": "postpost",
+    "sshHostKey": "",
+    "consoleUser": "debug",
+    "consolePass": "debug"
+  }
+]
