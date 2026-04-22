@@ -74,7 +74,7 @@ main {
   padding: 0;
 }
 
-/* ── Layout grille générique (AXL) ──────────── */
+/* ── Generic grid layout (AXL) ──────────── */
 .page-grid {
   display: flex;
   gap: 0;
@@ -89,14 +89,14 @@ main {
   .page-grid { flex-direction: column; }
 }
 
-/* ── Sidebar générique ───────────────────────── */
+/* ── Generic sidebar ──────────────────── */
 .sidebar {
   display: flex;
   flex-direction: column;
   gap: 14px;  width: 300px;
   flex-shrink: 0;}
 
-/* ══ Onglet Contrôleur — layout plein écran, zéro marge ══ */
+/* ══ Controller tab - full screen layout, zero margin ══ */
 #tab-controller.active {
   display: flex;
   flex-direction: column;
@@ -105,7 +105,7 @@ main {
   padding: 0;
 }
 
-/* Bandeau téléphone actif */
+/* Active phone banner */
 .ctrl-banner {
   flex: 0 0 auto;
   display: flex;
@@ -138,7 +138,7 @@ main {
   gap: 0;
 }
 
-/* Col 1 : Commandes + Journal */
+/* Col 1: Commands + Log */
 .ctrl-left {
   display: flex;
   flex-direction: column;
@@ -159,7 +159,7 @@ main {
   overflow-y: auto;
 }
 
-/* Col 2 : Écran + Softkeys */
+/* Col 2: Screen + Softkeys */
 .ctrl-screen-col {
   display: flex;
   flex-direction: column;
@@ -185,7 +185,7 @@ main {
   object-fit: contain;
 }
 
-/* Col 2 : Commandes + Touches + SSH + Log */
+/* Col 2: Commands + Keys + SSH + Log */
 .ctrl-controls-col {
   flex: 1;
   overflow-y: auto;
@@ -199,7 +199,7 @@ main {
   min-width: 0;
 }
 
-/* Commandes compactes en haut de la col droite */
+/* Compact commands at the top of the right column */
 .commands-inline {
   display: flex;
   flex-direction: column;
@@ -279,7 +279,7 @@ main {
   overflow-y: auto;
 }
 
-/* ── Journal (bas col droite) ────────────────── */
+/* ── Log (bottom right column) ─────────────── */
 .ctrl-log-section {
   border-top: 1px solid var(--border);
   padding-top: 14px;
@@ -455,7 +455,7 @@ button:active { transform: scale(0.97); }
   margin: 0;
 }
 
-/* Softkeys collées sous l'écran */
+/* Softkeys pinned below the screen */
 .softkey-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -562,7 +562,7 @@ button:active { transform: scale(0.97); }
 }
 
 
-/* ── Onglets ─────────────────────────────────── */
+/* ── Tabs ────────────────────────────────────── */
 .tab-bar {
   display: flex;
   gap: 0;
@@ -592,7 +592,7 @@ button:active { transform: scale(0.97); }
 .tab-pane         { display: none; }
 .tab-pane.active  { display: block; }
 
-/* Onglet AXL : padding classique */
+/* AXL tab: classic padding */
 #tab-axl.active   { padding: 18px 20px 32px; }
 
 /* ── Panneau AXL ─────────────────────────────── */
@@ -678,7 +678,7 @@ button:active { transform: scale(0.97); }
 .axl-badge-unreg   { background: #f8d7da; color: #721c24; }
 .axl-badge-unknown { background: #e9ecef; color: #6c757d; }
 
-/* ── Barre téléphone actif ───────────────────── */
+/* ── Active phone bar ──────────────────── */
 
 .active-phone-bar {
   display: flex;

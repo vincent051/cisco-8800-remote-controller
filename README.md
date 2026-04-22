@@ -1,6 +1,6 @@
 ﻿# Cisco 8800 Remote Controller
 
-Application web locale pour piloter des **téléphones Cisco IP Phone série 8800** et gérer les ressources CUCM via l'API AXL.
+Local web application to control **Cisco IP Phone 8800 series** phones and manage CUCM resources via the AXL API.
 
 ![PowerShell 5.1](https://img.shields.io/badge/PowerShell-5.1-blue?style=flat-square)
 ![Platform Windows](https://img.shields.io/badge/Platform-Windows-lightgrey?style=flat-square)
@@ -8,63 +8,63 @@ Application web locale pour piloter des **téléphones Cisco IP Phone série 880
 
 ---
 
-## Fonctionnalités
+## Features
 
-| Onglet | Description |
-|--------|-------------|
-| **Contrôleur** | Clavier physique complet (touches molles, navigation, clavier numérique, lignes), écran partagé redimensionnable |
-| **AXL / CUCM** | Liste tous les téléphones du CUCM avec IP en temps réel et statut d'enregistrement, provisioning en un clic |
-| **Diagnostics SSH** | Console SSH interactive vers le téléphone via plink |
+| Tab | Description |
+|-----|-------------|
+| **Controller** | Full physical keypad (softkeys, navigation, numeric keypad, lines), resizable split screen |
+| **AXL / CUCM** | Lists all CUCM phones with real-time IP and registration status, one-click provisioning |
+| **SSH Diagnostics** | Interactive SSH console to the phone via plink |
 
 ---
 
-## Prérequis
+## Prerequisites
 
-| Composant | Version / Note |
+| Component | Version / Note |
 |-----------|----------------|
-| Windows | 10 ou supérieur |
-| PowerShell | **5.1** (intégré à Windows) — PS6/PS7 non supportés |
-| [plink.exe](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html) | Release 0.83 minimum — pour les diagnostics SSH |
-| Connectivité réseau | Accès IP direct aux téléphones (port 80) et au CUCM (port 8443) |
+| Windows | 10 or later |
+| PowerShell | **5.1** (built into Windows) — PS6/PS7 not supported |
+| [plink.exe](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html) | Release 0.83 minimum — for SSH diagnostics |
+| Network connectivity | Direct IP access to phones (port 80) and to CUCM (port 8443) |
 
 ---
 
 ## Installation
 
-### 1. Cloner ou télécharger le dépôt
+### 1. Clone or download the repository
 
 ```powershell
-git clone https://github.com/VOTRE_USER/cisco-8800-remote-controller.git
+git clone https://github.com/YOUR_USER/cisco-8800-remote-controller.git
 cd cisco-8800-remote-controller
 ```
 
-Ou télécharger le ZIP depuis la page GitHub et extraire.
+Or download the ZIP from the GitHub page and extract it.
 
-### 2. Installer plink
+### 2. Install plink
 
-Télécharger `plink.exe` depuis [putty.org](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html) et le placer dans un répertoire dans le `PATH` (par exemple `C:\Windows\System32\` ou `C:\tools\`).
+Download `plink.exe` from [putty.org](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html) and place it in a directory in the `PATH` (e.g. `C:\Windows\System32\` or `C:\tools\`).
 
-Vérifier :
+Verify:
 ```powershell
 plink -V
-# Doit afficher : plink: Release 0.83
+# Should display: plink: Release 0.83
 ```
 
-### 3. Configurer les téléphones
+### 3. Configure phones
 
 ```powershell
 Copy-Item .\phones.example.json .\phones.json
 ```
 
-Éditer `phones.json` — chaque entrée représente un téléphone :
+Edit `phones.json` — each entry represents a phone:
 
 ```json
 [
   {
     "sep":         "SEP001122334455",
-    "name":        "Accueil",
+    "name":        "Reception",
     "ip":          "192.168.1.50",
-    "description": "Cisco CP-8845 — Réception",
+    "description": "Cisco CP-8845 — Front Desk",
     "username":    "admin",
     "password":    "cisco",
     "sshUser":     "admin",
@@ -76,189 +76,189 @@ Copy-Item .\phones.example.json .\phones.json
 ]
 ```
 
-> `phones.json` est dans `.gitignore` — il ne sera jamais commité.
+> `phones.json` is in `.gitignore` — it will never be committed.
 
-### 4. Lancer le serveur
+### 4. Start the server
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\server.ps1
 ```
 
-Le serveur démarre sur **http://localhost:8084**.
+The server starts on **http://localhost:8084**.
 
-#### Scripts utilitaires fournis
+#### Included utility scripts
 
-| Script | Rôle |
-|--------|------|
-| `install.ps1` | Crée des raccourcis Bureau et Menu Démarrer, vérifie plink, copie `phones.example.json` |
-| `launch.ps1` | Vérifie si le serveur tourne, le démarre si besoin, ouvre le navigateur |
-| `restart-server.ps1` | Arrête le serveur existant, vérifie la syntaxe PS, relance |
+| Script | Purpose |
+|--------|---------|
+| `install.ps1` | Creates Desktop and Start Menu shortcuts, verifies plink, copies `phones.example.json` |
+| `launch.ps1` | Checks if the server is running, starts it if needed, opens the browser |
+| `restart-server.ps1` | Stops the existing server, checks PS syntax, restarts |
 
 ```powershell
-# Installation complète (à exécuter une seule fois)
+# Full installation (run once)
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 
-# Lancement quotidien
+# Daily launch
 powershell -ExecutionPolicy Bypass -File .\launch.ps1
 ```
 
 ---
 
-## Configuration CUCM
+## CUCM Configuration
 
-> Cette section est nécessaire uniquement pour utiliser l'onglet **AXL / CUCM**.
+> This section is only required to use the **AXL / CUCM** tab.
 
-### 1. Activer le service AXL
+### 1. Enable the AXL service
 
-Dans **Cisco Unified Serviceability** (`https://{cucm}/ccmservice`) :
-
-1. **Tools → Service Activation**
-2. Sélectionner le nœud Publisher dans la liste déroulante
-3. Cocher **Cisco AXL Web Service**
-4. Cliquer **Save** puis **OK**
-
-### 2. Activer le service RisPort70 (statut en temps réel)
-
-Toujours dans **Cisco Unified Serviceability** :
+In **Cisco Unified Serviceability** (`https://{cucm}/ccmservice`):
 
 1. **Tools → Service Activation**
-2. Cocher **Cisco RIS Data Collector**
+2. Select the Publisher node from the dropdown
+3. Check **Cisco AXL Web Service**
+4. Click **Save** then **OK**
+
+### 2. Enable the RisPort70 service (real-time status)
+
+Still in **Cisco Unified Serviceability**:
+
+1. **Tools → Service Activation**
+2. Check **Cisco RIS Data Collector**
 3. **Save**
 
-> RisPort70 permet d'obtenir l'adresse IP et le statut d'enregistrement en temps réel. Sans ce service actif, les statuts affichent « Inconnu ».
+> RisPort70 provides real-time IP address and registration status. Without this service active, statuses display as "Unknown".
 
-### 3. Créer un utilisateur applicatif AXL
+### 3. Create an AXL application user
 
-Dans **Cisco Unified CM Administration** (`https://{cucm}/ccmadmin`) :
+In **Cisco Unified CM Administration** (`https://{cucm}/ccmadmin`):
 
 1. **User Management → Application User → Add New**
-2. Remplir les champs :
-   - **User ID** : `axl-controller` (ou le nom souhaité)
-   - **Password** / **Confirm Password** : mot de passe robuste
-   - **Description** : `Cisco 8800 Remote Controller`
-3. Dans **Permissions Information**, cliquer **Add to User Group** et ajouter :
+2. Fill in the fields:
+   - **User ID**: `axl-controller` (or any desired name)
+   - **Password** / **Confirm Password**: strong password
+   - **Description**: `Cisco 8800 Remote Controller`
+3. Under **Permissions Information**, click **Add to User Group** and add:
 
-   | Groupe / Rôle | Pourquoi |
-   |---------------|----------|
-   | `Standard AXL API Access` | Opérations AXL (listPhone, getPhone, updatePhone…) |
-   | `Standard RealtimeAndTraceCollection` | Accès RisPort70 (IP et statut en temps réel) |
+   | Group / Role | Why |
+   |--------------|-----|
+   | `Standard AXL API Access` | AXL operations (listPhone, getPhone, updatePhone…) |
+   | `Standard RealtimeAndTraceCollection` | RisPort70 access (real-time IP and status) |
    | `Standard CCM Admin Users` | updatePhone, doDeviceReset, executeSQLUpdate |
 
 4. **Save**
 
-> **Note CUCM 11.5** : pour `executeSQLUpdate` (copie du hash SSH), des droits supplémentaires peuvent être nécessaires. Si une erreur 401/403 apparaît lors du provisioning, ajouter le rôle `Standard CCM Super Users` ou utiliser un compte administrateur.
+> **CUCM 11.5 note**: for `executeSQLUpdate` (SSH hash copy), additional rights may be required. If a 401/403 error appears during provisioning, add the `Standard CCM Super Users` role or use an administrator account.
 
-### 4. Activer l'accès web sur les téléphones
+### 4. Enable web access on phones
 
-Le contrôleur envoie des commandes via `http://{ip}/CGI/Execute`. L'accès web doit être activé sur chaque téléphone.
+The controller sends commands via `http://{ip}/CGI/Execute`. Web access must be enabled on each phone.
 
-#### Option A — Via un Common Phone Profile (recommandé, applique à plusieurs téléphones)
+#### Option A — Via a Common Phone Profile (recommended, applies to multiple phones)
 
 1. **Device → Device Settings → Common Phone Profile**
-2. Modifier le profil utilisé par vos téléphones 8800
-3. Dans **Product Specific Configuration Layout** :
-   - **Web Access** : `Enabled`
+2. Edit the profile used by your 8800 phones
+3. In **Product Specific Configuration Layout**:
+   - **Web Access**: `Enabled`
 4. **Save → Apply Config**
-5. Redémarrer les téléphones concernés (**Device → Phone → Reset**)
+5. Restart the affected phones (**Device → Phone → Reset**)
 
-#### Option B — Par téléphone individuellement
+#### Option B — Per phone individually
 
-1. **Device → Phone** → sélectionner le téléphone
-2. Dans **Product Specific Configuration Layout** :
-   - **Web Access** : `Enabled`
+1. **Device → Phone** → select the phone
+2. In **Product Specific Configuration Layout**:
+   - **Web Access**: `Enabled`
 3. **Save → Apply Config → Reset**
 
-### 5. Activer SSH sur les téléphones
+### 5. Enable SSH on phones
 
-L'accès SSH est nécessaire pour les diagnostics SSH.
+SSH access is required for SSH diagnostics.
 
-#### Via le bouton 🎮 Contrôle (automatique)
+#### Via the 🎮 Control button (automatic)
 
-Le provisioning automatique active SSH, configure le mot de passe et redémarre le téléphone en un seul clic depuis l'onglet AXL.
+Automatic provisioning enables SSH, configures the password, and restarts the phone in a single click from the AXL tab.
 
-#### Manuellement via CUCM Admin
+#### Manually via CUCM Admin
 
-1. **Device → Phone** → sélectionner le téléphone
-2. Dans **Product Specific Configuration Layout** :
-   - **SSH Access** : `Enabled`
-   - **SSH User ID** : identifiant SSH souhaité (ex. `admin`)
+1. **Device → Phone** → select the phone
+2. In **Product Specific Configuration Layout**:
+   - **SSH Access**: `Enabled`
+   - **SSH User ID**: desired SSH username (e.g. `admin`)
 3. **Save → Apply Config → Reset**
 
-> **Limitation CUCM 11.5** : `updatePhone` ignore silencieusement `sshAccess`/`webAccess` en champ de haut niveau. L'application utilise `vendorConfig` en contournement — transparent pour l'utilisateur.
+> **CUCM 11.5 limitation**: `updatePhone` silently ignores `sshAccess`/`webAccess` at the top level. The application uses `vendorConfig` as a workaround — transparent to the user.
 
-### 6. Credentials HTTP des téléphones
+### 6. Phone HTTP credentials
 
-Les téléphones Cisco 8800 utilisent l'authentification HTTP Basic pour `/CGI/Execute`.
+Cisco 8800 phones use HTTP Basic authentication for `/CGI/Execute`.
 
-Pour définir ou modifier les credentials :
+To set or change credentials:
 
-1. **System → Enterprise Phone Configuration** (global) ou **Device → Phone** (individuel)
-2. Champ **Phone HTTP Authentication Mode** : `Enabled`
-3. Définir **HTTP Admin Username** et **HTTP Admin Password**
+1. **System → Enterprise Phone Configuration** (global) or **Device → Phone** (individual)
+2. **Phone HTTP Authentication Mode**: `Enabled`
+3. Set **HTTP Admin Username** and **HTTP Admin Password**
 
-Ces valeurs correspondent aux champs `username` et `password` dans `phones.json`.
+These values correspond to the `username` and `password` fields in `phones.json`.
 
 ---
 
-## Utilisation
+## Usage
 
-### Onglet Contrôleur
+### Controller Tab
 
-1. Sélectionner un téléphone dans la liste déroulante
-2. Utiliser les touches :
-   - **Molles** (Soft1–4) : touches contextuelles de l'écran du téléphone
-   - **Navigation** : flèches directionnelles, Select, Back, Home
-   - **Clavier numérique** : 0–9, `*`, `#`
-   - **Lignes** : L1–L4 (sélection de ligne)
-   - **Volume**, **Haut-parleur**, **Muet**, **Raccrocher**
-3. Le séparateur vertical est glissable pour ajuster la largeur des colonnes
+1. Select a phone from the dropdown list
+2. Use the keys:
+   - **Softkeys** (Soft1–4): contextual keys on the phone screen
+   - **Navigation**: directional arrows, Select, Back, Home
+   - **Numeric keypad**: 0–9, `*`, `#`
+   - **Lines**: L1–L4 (line selection)
+   - **Volume**, **Speaker**, **Mute**, **Hangup**
+3. The vertical splitter is draggable to adjust column widths
 
-### Onglet AXL / CUCM
+### AXL / CUCM Tab
 
-1. Renseigner les champs CUCM :
-   - **CUCM IP** : adresse IP du Publisher
-   - **Utilisateur AXL** / **Mot de passe**
-   - **Version AXL** : `auto` (détection automatique) ou `11.5` / `15.0`
-2. Cliquer **📋 Lister les téléphones**
-3. Le tableau affiche : Nom SEP, Description, Modèle, Device Pool, IP (temps réel), Statut (Enregistré / Non enregistré / Inconnu)
-4. Bouton **🎮 Contrôle** : provisionne le téléphone et bascule sur le contrôleur
+1. Fill in the CUCM fields:
+   - **CUCM IP**: Publisher IP address
+   - **AXL User** / **Password**
+   - **AXL Version**: `auto` (auto-detect) or `11.5` / `15.0`
+2. Click **📋 List Phones**
+3. The table shows: SEP Name, Description, Model, Device Pool, IP (real-time), Status (Registered / Not Registered / Unknown)
+4. **🎮 Control** button: provisions the phone and switches to the controller
 
-### Provisioning automatique (bouton 🎮 Contrôle)
+### Automatic provisioning (🎮 Control button)
 
-Séquence exécutée automatiquement :
+Sequence executed automatically:
 
-1. Assignation du téléphone à l'utilisateur CUCM spécifié
-2. Activation SSH + Web Access via `vendorConfig`
-3. Configuration du mot de passe SSH (via `executeSQLUpdate`)
-4. Redémarrage du téléphone (`doDeviceReset`)
-5. Récupération de l'IP en temps réel via RisPort70
-6. Ajout automatique dans `phones.json`
+1. Assign the phone to the specified CUCM user
+2. Enable SSH + Web Access via `vendorConfig`
+3. Configure the SSH password (via `executeSQLUpdate`)
+4. Restart the phone (`doDeviceReset`)
+5. Retrieve real-time IP via RisPort70
+6. Automatically add to `phones.json`
 
 ---
 
-## API REST
+## REST API
 
-Le serveur expose les endpoints suivants sur `http://localhost:8084` :
+The server exposes the following endpoints on `http://localhost:8084`:
 
-### Contrôle téléphone
+### Phone control
 
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| `GET` | `/api/phones` | Liste les téléphones de `phones.json` |
-| `POST` | `/api/phones/add` | Ajoute un téléphone à `phones.json` |
-| `POST` | `/api/execute` | Envoie une commande à un téléphone |
-| `GET` | `/api/phone/ssh` | Exécute une commande SSH sur un téléphone |
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/api/phones` | Lists phones from `phones.json` |
+| `POST` | `/api/phones/add` | Adds a phone to `phones.json` |
+| `POST` | `/api/execute` | Sends a command to a phone |
+| `GET` | `/api/phone/ssh` | Executes an SSH command on a phone |
 
-#### Modes pour `/api/execute`
+#### Modes for `/api/execute`
 
-| Mode | Valeur exemple | Description |
-|------|----------------|-------------|
-| `key` | `Speaker`, `Mute`, `Hold`, `Hangup` | Touche prédéfinie |
-| `key` | `KeyPad1`, `KeyPad0`, `KeyPadStar`, `KeyPadPound` | Touche numérique |
-| `dial` | `0102030405` | Composition de numéro |
-| `xml` | `<CiscoIPPhoneExecute>…</CiscoIPPhoneExecute>` | XML arbitraire |
+| Mode | Example value | Description |
+|------|---------------|-------------|
+| `key` | `Speaker`, `Mute`, `Hold`, `Hangup` | Predefined key |
+| `key` | `KeyPad1`, `KeyPad0`, `KeyPadStar`, `KeyPadPound` | Numeric key |
+| `dial` | `0102030405` | Dial a number |
+| `xml` | `<CiscoIPPhoneExecute>…</CiscoIPPhoneExecute>` | Arbitrary XML |
 
-Exemple :
+Example:
 ```powershell
 $body = @{
   ip       = "192.168.1.50"
@@ -274,19 +274,19 @@ Invoke-RestMethod -Uri "http://localhost:8084/api/execute" `
 
 ### AXL / CUCM
 
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| `POST` | `/api/axl/version` | Détecte la version AXL |
-| `POST` | `/api/axl/phones` | Liste les téléphones + statut RisPort70 |
-| `POST` | `/api/axl/phoneip` | IP en temps réel d'un téléphone |
-| `POST` | `/api/axl/provision` | Provisionne un téléphone |
+| Method | Route | Description |
+|--------|-------|-------------|
+| `POST` | `/api/axl/version` | Detects AXL version |
+| `POST` | `/api/axl/phones` | Lists phones + RisPort70 status |
+| `POST` | `/api/axl/phoneip` | Real-time IP of a phone |
+| `POST` | `/api/axl/provision` | Provisions a phone |
 
-Exemple — lister les téléphones :
+Example — list phones:
 ```powershell
 $body = @{
   cucm       = "172.27.199.11"
   username   = "axl-controller"
-  password   = "votremotdepasse"
+  password   = "yourpassword"
   axlVersion = "auto"
 } | ConvertTo-Json
 
@@ -296,43 +296,43 @@ Invoke-RestMethod -Uri "http://localhost:8084/api/axl/phones" `
 
 ---
 
-## Compatibilité CUCM
+## CUCM Compatibility
 
-| Version CUCM | Version AXL | Statut |
+| CUCM Version | AXL Version | Status |
 |-------------|-------------|--------|
-| 11.5 | 11.5 | ✅ Testé |
-| 15.0 | 15.0 | ✅ Testé |
+| 11.5 | 11.5 | ✅ Tested |
+| 15.0 | 15.0 | ✅ Tested |
 
-**Limitations CUCM 11.5 connues** :
-- `listPhone` : tags `<product/>` et `<ipAddress/>` invalides — non inclus
-- IP en temps réel non accessible via AXL SQL → RisPort70 utilisé
-- `updatePhone` ignore `sshAccess`/`webAccess` au niveau racine → `vendorConfig` utilisé
+**Known CUCM 11.5 limitations**:
+- `listPhone`: `<product/>` and `<ipAddress/>` tags are invalid — not included
+- Real-time IP not accessible via AXL SQL → RisPort70 used instead
+- `updatePhone` ignores `sshAccess`/`webAccess` at root level → `vendorConfig` used
 
 ---
 
-## Dépannage
+## Troubleshooting
 
-### Le serveur ne démarre pas
+### Server does not start
 
 ```powershell
-# Vérifier la syntaxe du script
+# Check script syntax
 [System.Management.Automation.Language.Parser]::ParseFile(
   "$PWD\server.ps1", [ref]$null, [ref]$null
 )
 
-# Vérifier si le port est occupé
+# Check if port is in use
 netstat -an | findstr :8084
 
-# Relancer proprement
+# Clean restart
 .\restart-server.ps1
 ```
 
-### Le téléphone renvoie Status=6 "URI not found"
+### Phone returns Status=6 "URI not found"
 
-- Vérifier que **Web Access** est activé (voir [section CUCM](#4-activer-laccès-web-sur-les-téléphones))
-- Le nom de touche est sensible à la casse : `KeyPad1` ✅ — `keypad1` ❌
+- Verify that **Web Access** is enabled (see [CUCM section](#4-enable-web-access-on-phones))
+- Key names are case-sensitive: `KeyPad1` ✅ — `keypad1` ❌
 
-Test manuel :
+Manual test:
 ```powershell
 $creds = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("admin:cisco"))
 $xml   = "<CiscoIPPhoneExecute><ExecuteItem Priority=`"0`" URL=`"Key:Speaker`" /></CiscoIPPhoneExecute>"
@@ -342,40 +342,40 @@ Invoke-WebRequest -Uri "http://192.168.1.50/CGI/Execute" -Method POST `
   -ContentType "application/x-www-form-urlencoded" -UseBasicParsing
 ```
 
-### L'onglet AXL ne fonctionne pas
+### AXL tab does not work
 
-| Symptôme | Cause probable | Solution |
-|----------|----------------|----------|
-| `401 Unauthorized` | Credentials incorrects | Vérifier User ID / Password |
-| `403 Forbidden` | Rôle AXL manquant | Ajouter `Standard AXL API Access` |
-| `500 Internal Server Error` | Service AXL inactif | Activer dans Serviceability |
-| Connexion refusée | Mauvaise IP ou port 8443 bloqué | Vérifier IP et pare-feu |
-| Statuts « Inconnu » | RIS Data Collector inactif | Activer dans Serviceability |
-
----
-
-## Sécurité
-
-- Application conçue pour **usage local uniquement** — ne pas exposer publiquement.
-- `phones.json` (contient les credentials) est dans `.gitignore`.
-- Communications CUCM en HTTPS avec bypass du certificat auto-signé (normal en réseau d'entreprise interne).
-- Aucun mot de passe n'est loggé en clair.
+| Symptom | Likely cause | Solution |
+|---------|--------------|----------|
+| `401 Unauthorized` | Incorrect credentials | Check User ID / Password |
+| `403 Forbidden` | Missing AXL role | Add `Standard AXL API Access` |
+| `500 Internal Server Error` | AXL service inactive | Enable in Serviceability |
+| Connection refused | Wrong IP or port 8443 blocked | Check IP and firewall |
+| Statuses "Unknown" | RIS Data Collector inactive | Enable in Serviceability |
 
 ---
 
-## Structure du projet
+## Security
+
+- Application designed for **local use only** — do not expose publicly.
+- `phones.json` (contains credentials) is in `.gitignore`.
+- CUCM communications over HTTPS with self-signed certificate bypass (normal in internal corporate networks).
+- No passwords are logged in plain text.
+
+---
+
+## Project Structure
 
 ```
 cisco-8800-remote-controller/
-├── server.ps1              # Serveur HTTP PowerShell 5.1 (port 8084)
-├── install.ps1             # Création raccourcis + vérifications initiales
-├── launch.ps1              # Démarrage serveur + ouverture navigateur
-├── restart-server.ps1      # Redémarrage propre du serveur
-├── phones.example.json     # Modèle de configuration téléphones
-├── phones.json             # Configuration réelle (gitignore — ne pas commiter)
+├── server.ps1              # PowerShell 5.1 HTTP server (port 8084)
+├── install.ps1             # Shortcut creation + initial checks
+├── launch.ps1              # Server start + browser open
+├── restart-server.ps1      # Clean server restart
+├── phones.example.json     # Phone configuration template
+├── phones.json             # Actual configuration (gitignored — do not commit)
 ├── web/
-│   ├── index.html          # Interface principale
-│   ├── app.js              # Logique frontend
+│   ├── index.html          # Main interface
+│   ├── app.js              # Frontend logic
 │   └── styles.css          # Styles
 └── .github/
     └── copilot-instructions.md
@@ -383,6 +383,6 @@ cisco-8800-remote-controller/
 
 ---
 
-## Licence
+## License
 
-MIT License — voir [LICENSE](LICENSE) pour les détails.
+MIT License — see [LICENSE](LICENSE) for details.

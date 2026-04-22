@@ -6,7 +6,7 @@ param(
 Set-StrictMode -Off
 $ErrorActionPreference = "Continue"
 
-# ---- TLS bypass pour appels AXL (certificat auto-signe CUCM) ----
+# ---- TLS bypass for AXL calls (CUCM self-signed certificate) ----
 Add-Type @"
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
@@ -16,7 +16,7 @@ public class TrustAllCerts : ICertificatePolicy {
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCerts
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
-# TLS 1.2 + TLS 1.3 (12288) pour CUCM 14+ qui exige TLS 1.3
+# TLS 1.2 + TLS 1.3 (12288) for CUCM 14+ which requires TLS 1.3
 try {
     $tls13val = [System.Net.SecurityProtocolType]12288
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor $tls13val
@@ -42,7 +42,7 @@ function Read-Phones {
         return @()
     }
 
-    # @() force un tableau meme si phones.json ne contient qu'un seul element (PS5 deserialie en PSObject sinon)
+    # @() forces an array even if phones.json contains only one element (PS5 deserializes as PSObject otherwise)
     return @(Get-Content -Path $Path -Raw | ConvertFrom-Json)
 }
 
@@ -58,9 +58,9 @@ function ConvertTo-ExecuteXml {
     switch ($Mode.ToLowerInvariant()) {
         "key" {
             if ([string]::IsNullOrWhiteSpace($Value)) {
-                throw "Le parametre 'value' est requis pour mode=key."
+            throw "The 'value' parameter is required for mode=key."
             }
-            # Mapping des touches numeriques vers le format KeyPad requis par Cisco 8800
+            # Mapping numeric keys to KeyPad format required by Cisco 8800
             $keyMap = @{
                 "0" = "KeyPad0"; "1" = "KeyPad1"; "2" = "KeyPad2"; "3" = "KeyPad3"
                 "4" = "KeyPad4"; "5" = "KeyPad5"; "6" = "KeyPad6"; "7" = "KeyPad7"
@@ -72,19 +72,19 @@ function ConvertTo-ExecuteXml {
         }
         "dial" {
             if ([string]::IsNullOrWhiteSpace($Value)) {
-                throw "Le parametre 'value' est requis pour mode=dial."
+            throw "The 'value' parameter is required for mode=dial."
             }
             $escapedValue = [System.Security.SecurityElement]::Escape($Value)
             return "<CiscoIPPhoneExecute><ExecuteItem Priority=`"0`" URL=`"Dial:$escapedValue`" /></CiscoIPPhoneExecute>"
         }
         "xml" {
             if ([string]::IsNullOrWhiteSpace($Value)) {
-                throw "Le XML est vide pour mode=xml."
+            throw "XML is empty for mode=xml."
             }
             return $Value
         }
         default {
-            throw "Mode invalide. Valeurs supportees: key, dial, xml."
+            throw "Invalid mode. Supported values: key, dial, xml."
         }
     }
 }
@@ -106,8 +106,8 @@ function Invoke-CiscoExecute {
 
     $uri = "http://$Ip/CGI/Execute"
 
-    # Le telephone attend un form field "XML=..." (application/x-www-form-urlencoded)
-    # et une authentification Basic avec le user CUCM associe au phone
+    # The phone expects a form field "XML=..." (application/x-www-form-urlencoded)
+    # and Basic authentication with the CUCM user associated with the phone
     $formBody = "XML=" + [System.Uri]::EscapeDataString($XmlBody)
 
     $headers = @{}
@@ -163,7 +163,7 @@ function Write-FileResponse {
     if (-not (Test-Path -Path $Path)) {
         Write-JsonResponse -Response $Response -StatusCode 404 -Payload @{
             ok = $false
-            error = "Fichier introuvable."
+            error = "File not found."
         }
         return
     }
@@ -223,7 +223,7 @@ $SoapBody
         $errResp = $webEx.Response
         $httpCode = if ($errResp) { [int]$errResp.StatusCode } else { 0 }
 
-        # Lit le corps de la reponse d'erreur (SOAP Fault)
+        # Read the error response body (SOAP Fault)
         $errBody = ""
         if ($errResp) {
             try {
@@ -233,7 +233,7 @@ $SoapBody
             } catch {}
         }
 
-        # Extrait le faultstring (peut contenir des entites XML)
+        # Extract faultstring (may contain XML entities)
         $faultMsg = ""
         if ($errBody -match "(?s)<faultstring[^>]*>(.+?)</faultstring>") {
             $raw = $Matches[1] -replace "&amp;","&" -replace "&lt;","<" -replace "&gt;",">" -replace "&apos;","'" -replace "&quot;",'"'
@@ -244,11 +244,11 @@ $SoapBody
         Write-Log "AXL HTTP $httpCode body: $($errBody.Substring(0,[Math]::Min(300,$errBody.Length)))"
 
         switch ($httpCode) {
-            401 { throw "AXL 401 Unauthorized$faultMsg. Verifier que '$Username' a le role 'Standard AXL API Access' dans CUCM > User Management > Application User." }
-            403 { throw "AXL 403 Forbidden$faultMsg. Acces refuse pour '$Username'." }
+            401 { throw "AXL 401 Unauthorized$faultMsg. Check that '$Username' has the 'Standard AXL API Access' role in CUCM > User Management > Application User." }
+            403 { throw "AXL 403 Forbidden$faultMsg. Access denied for '$Username'." }
             500 { throw "AXL 500 SOAP Fault$faultMsg." }
-            599 { throw "AXL 599$faultMsg. Verifier l'IP CUCM et que le service 'Cisco AXL Web Service' est actif (CUCM Serviceability)." }
-            0   { throw "AXL connexion impossible vers $Cucm`:8443 - $($webEx.Message)" }
+            599 { throw "AXL 599$faultMsg. Check the CUCM IP and that the 'Cisco AXL Web Service' is active (CUCM Serviceability)." }
+            0   { throw "AXL connection failed to $Cucm`:8443 - $($webEx.Message)" }
             default { throw "AXL HTTP $httpCode$faultMsg - $($webEx.Message)" }
         }
     }
@@ -295,14 +295,14 @@ function Get-AxlCucmVersion {
             else                                     { $axlVer = "10.0" }
             return @{ version = $axlVer; cucmVersion = $verStr }
         }
-        throw "Format de version CUCM inconnu: $verStr"
+        throw "Unknown CUCM version format: $verStr"
     } catch [System.Net.WebException] {
         $webEx    = $_.Exception
         $errResp  = $webEx.Response
         $httpCode = if ($errResp) { [int]$errResp.StatusCode } else { 0 }
         switch ($httpCode) {
-            401     { throw "AXL 401 - verifier les credentials '$Username'" }
-            0       { throw "AXL connexion impossible vers $Cucm`:8443 - $($webEx.Message)" }
+            401     { throw "AXL 401 - check credentials for '$Username'" }
+            0       { throw "AXL connection failed to $Cucm`:8443 - $($webEx.Message)" }
             default { throw "AXL HTTP $httpCode - $($webEx.Message)" }
         }
     }
@@ -325,7 +325,7 @@ function Get-AxlPhones {
     $phones = $xml.Envelope.Body.listPhoneResponse.return.phone
     $results = @()
     foreach ($p in $phones) {
-        # devicePoolName peut etre un objet avec attribut #text ou une string simple
+        # devicePoolName can be an object with #text attribute or a simple string
         $dp = if ($p.devicePoolName -is [System.Xml.XmlElement]) { $p.devicePoolName.InnerText } else { [string]$p.devicePoolName }
         $results += @{
             name        = [string]$p.name
@@ -392,7 +392,7 @@ function Get-RisPort70BulkStatus {
                 if ($devName) { $result[$devName] = @{ ip = $devIp; status = $devStat } }
             }
         } catch {
-            Write-Log "RisPort70 bulk lot $bi erreur: $($_.Exception.Message)"
+            Write-Log "RisPort70 bulk batch $bi error: $($_.Exception.Message)"
         }
     }
     return $result
@@ -426,9 +426,9 @@ function Add-AxlDeviceToUser {
             $getXml  = [xml]$getResp.Content
             $existing = @($getXml.Envelope.Body.getAppUserResponse.return.appUser.associatedDevices.device)
             $existing = @($existing | Where-Object { $_ -ne $null -and ([string]$_ -ne $DeviceName) })
-            Write-Log "getAppUser '$UserId' -> $($existing.Count) device(s) existant(s)"
+            Write-Log "getAppUser '$UserId' -> $($existing.Count) existing device(s)"
         } catch {
-            Write-Log "getAppUser '$UserId' ignoré (nouveau ou aucun device): $_"
+            Write-Log "getAppUser '$UserId' ignored (new or no devices): $_"
         }
 
         $allDevices = @($existing) + @($DeviceName)
@@ -446,7 +446,7 @@ function Add-AxlDeviceToUser {
         } catch {
             $msg = [string]$_
             if ($msg -match "500") {
-                throw "AXL 500 : l'Application User '$UserId' est introuvable dans CUCM. Verifier CUCM Admin > User Management > Application User."
+                throw "AXL 500: Application User '$UserId' not found in CUCM. Check CUCM Admin > User Management > Application User."
             }
             throw $_
         }
@@ -470,9 +470,9 @@ function Add-AxlDeviceToUser {
             $getXml  = [xml]$getResp.Content
             $existing = @($getXml.Envelope.Body.getUserResponse.return.user.associatedDevices.device)
             $existing = @($existing | Where-Object { $_ -and ([string]$_ -ne $DeviceName) })
-            Write-Log "getUser '$UserId' -> $($existing.Count) device(s) existant(s)"
+            Write-Log "getUser '$UserId' -> $($existing.Count) existing device(s)"
         } catch {
-            Write-Log "getUser '$UserId' ignoré: $_"
+            Write-Log "getUser '$UserId' ignored: $_"
         }
 
         $allDevices = @($existing) + @($DeviceName)
@@ -490,7 +490,7 @@ function Add-AxlDeviceToUser {
         } catch {
             $msg = [string]$_
             if ($msg -match "500") {
-                throw "AXL 500 : l'utilisateur '$UserId' n'existe pas comme End User dans CUCM. Verifier CUCM Admin > User Management > End User."
+                throw "AXL 500: User '$UserId' does not exist as End User in CUCM. Check CUCM Admin > User Management > End User."
             }
             throw $_
         }
@@ -505,13 +505,13 @@ $listener.Prefixes.Add($prefix)
 try {
     $listener.Start()
 } catch {
-    Write-Host "Erreur demarrage sur port $Port : $($_.Exception.Message)"
-    Write-Host "Conseil : verifier qu'aucune autre instance ne tourne sur ce port."
+    Write-Host "Error starting on port $Port : $($_.Exception.Message)"
+    Write-Host "Tip: check that no other instance is running on this port."
     exit 1
 }
 
-Write-Log "Cisco 8800 Controller en ecoute sur $prefix"
-Write-Log "App web: http://localhost:$Port/"
+Write-Log "Cisco 8800 Controller listening on $prefix"
+Write-Log "Web app: http://localhost:$Port/"
 Write-Log "API: GET /api/phones, POST /api/execute"
 
 try {
@@ -545,7 +545,7 @@ try {
             if ($method -eq "GET" -and $path -eq "/api/phones") {
                 $phonesPath = Join-Path $PSScriptRoot $PhonesFile
                 $phones = Read-Phones -Path $phonesPath
-                # Serialiser manuellement en tableau JSON (ConvertTo-Json PS5 ne gere pas bien les tableaux)
+                # Serialize manually as JSON array (ConvertTo-Json PS5 doesn't handle arrays well)
                 $items = @($phones) | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 4 -Compress }
                 $json = "[" + ($items -join ",") + "]"
                 $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
@@ -562,13 +562,13 @@ try {
                 $raw = $reader.ReadToEnd(); $reader.Close()
                 $body = $raw | ConvertFrom-Json
 
-                if ([string]::IsNullOrWhiteSpace($body.sep)) { throw "Le champ 'sep' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.ip))  { throw "Le champ 'ip' est requis." }
+                if ([string]::IsNullOrWhiteSpace($body.sep)) { throw "Field 'sep' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.ip))  { throw "Field 'ip' is required." }
 
                 $phonesPath = Join-Path $PSScriptRoot $PhonesFile
                 $phones = [System.Collections.ArrayList]@(Read-Phones -Path $phonesPath)
 
-                # Supprimer l'entree existante pour ce SEP si elle existe (mise a jour)
+                # Remove existing entry for this SEP if it exists (update)
                 $existing = $phones | Where-Object { $_.sep -eq [string]$body.sep }
                 if ($existing) { $null = $phones.Remove($existing) }
 
@@ -587,7 +587,7 @@ try {
                 }
                 $null = $phones.Add($newPhone)
 
-                # Ecrire le fichier JSON (tableau formaté)
+                # Write JSON file (formatted array)
                 $items = @($phones) | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 4 -Compress }
                 $jsonOut = "[`n  " + ($items -join ",`n  ") + "`n]"
                 [System.IO.File]::WriteAllText($phonesPath, $jsonOut, [System.Text.Encoding]::UTF8)
@@ -608,13 +608,13 @@ try {
                 $reader.Close()
 
                 if ([string]::IsNullOrWhiteSpace($raw)) {
-                    throw "Le corps JSON est vide."
+                    throw "JSON body is empty."
                 }
 
                 $body = $raw | ConvertFrom-Json
 
                 if ([string]::IsNullOrWhiteSpace($body.ip)) {
-                    throw "Le champ 'ip' est requis."
+                    throw "Field 'ip' is required."
                 }
 
                 $mode = [string]$body.mode
@@ -625,7 +625,7 @@ try {
                 $xml = ConvertTo-ExecuteXml -Mode $mode -Value $value
                 $phoneRes = Invoke-CiscoExecute -Ip $body.ip -XmlBody $xml -Username $username -Password $password
 
-                # Lire le corps de la reponse du telephone (Content peut etre string ou byte[] selon PS5/content-type)
+                # Read the phone response body (Content can be string or byte[] depending on PS5/content-type)
                 $phoneBody = ""
                 if ($phoneRes.Content -is [string]) {
                     $phoneBody = $phoneRes.Content
@@ -633,11 +633,11 @@ try {
                     $phoneBody = [System.Text.Encoding]::UTF8.GetString($phoneRes.Content)
                 }
 
-                # Si le telephone renvoie une erreur XML, la signaler
+                # If the phone returns an XML error, report it
                 if ($phoneBody -match "CiscoIPPhoneError") {
                     $errNum = ""
                     if ($phoneBody -match 'Number="(\d+)"') { $errNum = " (code $($Matches[1]))" }
-                    throw "Le telephone a refuse la commande$errNum. Verifier les credentials et que 'Web Access' est active dans UCM."
+                    throw "The phone rejected the command$errNum. Check credentials and that 'Web Access' is enabled in UCM."
                 }
 
                 Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
@@ -660,7 +660,7 @@ try {
                 $pword = $query["password"]
 
                 if ([string]::IsNullOrWhiteSpace($ip)) {
-                    throw "Le parametre 'ip' est requis."
+                    throw "Parameter 'ip' is required."
                 }
 
                 $hdrs = @{}
@@ -673,10 +673,10 @@ try {
                 $imgRes = Invoke-WebRequest -Method Get -Uri "http://$ip/CGI/Screenshot" -Headers $hdrs -TimeoutSec 10 -UseBasicParsing
                 $ct = $imgRes.Headers["Content-Type"]
 
-                # Si le telephone renvoie du XML/texte c'est une erreur (ex: <CiscoIPPhoneError Number="4" />)
+                # If the phone returns XML/text it's an error (e.g.: <CiscoIPPhoneError Number="4" />)
                 if ([string]::IsNullOrEmpty($ct) -or $ct -notmatch "^image/") {
                     $rawText = $imgRes.Content
-                    $errMsg = "Screenshot non disponible (reponse: $rawText). Verifier que 'Web Access' est active dans Cisco UCM > Device > Phone > Product Specific Configuration."
+                    $errMsg = "Screenshot not available (response: $rawText). Check that 'Web Access' is enabled in Cisco UCM > Device > Phone > Product Specific Configuration."
                     throw $errMsg
                 }
 
@@ -688,8 +688,8 @@ try {
                 try {
                     $response.OutputStream.Write($imgBytes, 0, $imgBytes.Length)
                 } catch {
-                    # Client deconnecte pendant le transfert (ex: refresh, annulation navigateur)
-                    Write-Log "Screenshot: client deconnecte ($($_.Exception.Message.Split([char]10)[0]))"
+                    # Client disconnected during transfer (e.g.: refresh, browser cancel)
+                    Write-Log "Screenshot: client disconnected ($($_.Exception.Message.Split([char]10)[0]))"
                 } finally {
                     try { $response.OutputStream.Close() } catch {}
                 }
@@ -701,9 +701,9 @@ try {
                 $raw = $reader.ReadToEnd(); $reader.Close()
                 $body = $raw | ConvertFrom-Json
 
-                if ([string]::IsNullOrWhiteSpace($body.cucm))     { throw "Le champ 'cucm' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.username)) { throw "Le champ 'username' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.password)) { throw "Le champ 'password' est requis." }
+                if ([string]::IsNullOrWhiteSpace($body.cucm))     { throw "Field 'cucm' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.username)) { throw "Field 'username' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.password)) { throw "Field 'password' is required." }
 
                 $vInfo = Get-AxlCucmVersion -Cucm $body.cucm -Username $body.username -Password $body.password
                 Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
@@ -719,23 +719,23 @@ try {
                 $raw = $reader.ReadToEnd(); $reader.Close()
                 $body = $raw | ConvertFrom-Json
 
-                if ([string]::IsNullOrWhiteSpace($body.cucm))     { throw "Le champ 'cucm' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.username)) { throw "Le champ 'username' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.password)) { throw "Le champ 'password' est requis." }
+                if ([string]::IsNullOrWhiteSpace($body.cucm))     { throw "Field 'cucm' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.username)) { throw "Field 'username' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.password)) { throw "Field 'password' is required." }
 
                 $axlVer = if ($body.axlVersion -and $body.axlVersion -ne "auto") { [string]$body.axlVersion } else {
                     (Get-AxlCucmVersion -Cucm $body.cucm -Username $body.username -Password $body.password).version
                 }
                 $phones = Get-AxlPhones -Cucm $body.cucm -Username $body.username -Password $body.password -AxlVersion $axlVer
 
-                # Enrichissement RisPort70 : IP + statut d'enregistrement en temps reel
+                # RisPort70 enrichment: IP + real-time registration status
                 $deviceNames = @($phones | ForEach-Object { [string]$_.name })
                 $risMap = @{}
                 try {
                     $risMap = Get-RisPort70BulkStatus -Cucm $body.cucm -Username $body.username -Password $body.password -DeviceNames $deviceNames
-                    Write-Log "RisPort70 bulk: $($risMap.Count)/$($phones.Count) appareils avec statut"
+                    Write-Log "RisPort70 bulk: $($risMap.Count)/$($phones.Count) devices with status"
                 } catch {
-                    Write-Log "RisPort70 bulk indisponible (IP/statut absent): $($_.Exception.Message)"
+                    Write-Log "RisPort70 bulk unavailable (IP/status absent): $($_.Exception.Message)"
                 }
 
                 $enriched = @()
@@ -751,7 +751,7 @@ try {
                     }
                 }
 
-                # PS5 : serialiser le tableau phones manuellement pour eviter le bug single-element-array
+                # PS5: manually serialize phones array to avoid single-element-array bug
                 $phonesItems = @($enriched) | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 4 -Compress }
                 $phonesArray = "[" + ($phonesItems -join ",") + "]"
                 $axlResp = "{`"ok`":true,`"axlVersion`":`"$axlVer`",`"phones`":$phonesArray}"
@@ -769,16 +769,16 @@ try {
                 $raw = $reader.ReadToEnd(); $reader.Close()
                 $body = $raw | ConvertFrom-Json
 
-                if ([string]::IsNullOrWhiteSpace($body.cucm))     { throw "Le champ 'cucm' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.username)) { throw "Le champ 'username' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.password)) { throw "Le champ 'password' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.sep))      { throw "Le champ 'sep' est requis." }
+                if ([string]::IsNullOrWhiteSpace($body.cucm))     { throw "Field 'cucm' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.username)) { throw "Field 'username' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.password)) { throw "Field 'password' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.sep))      { throw "Field 'sep' is required." }
 
                 $axlVerIp = if ($body.axlVersion -and $body.axlVersion -ne "auto") { [string]$body.axlVersion } else {
                     (Get-AxlCucmVersion -Cucm $body.cucm -Username $body.username -Password $body.password).version
                 }
 
-                # RisPort70 : selectCmDevice pour obtenir l'IP en temps reel du telephone
+                # RisPort70: selectCmDevice to get the phone's real-time IP
                 $sepSafe  = [System.Security.SecurityElement]::Escape([string]$body.sep)
                 $risCucm  = [string]$body.cucm
                 $risUser  = [string]$body.username
@@ -822,9 +822,9 @@ try {
                     $risEx     = $_.Exception
                     $risStatus = if ($risEx.Response) { [int]$risEx.Response.StatusCode } else { 0 }
                     switch ($risStatus) {
-                        401     { throw "RisPort70 401 : acces refuse pour '$risUser'. Ajouter le role 'Standard RealtimeAndTraceCollection' ou 'Standard CCM Admin Users' dans CUCM > User Management." }
-                        403     { throw "RisPort70 403 : acces interdit pour '$risUser'. Verifier les roles dans CUCM." }
-                        0       { throw "RisPort70 connexion impossible vers ${risCucm}:8443 - $($risEx.Message)" }
+                        401     { throw "RisPort70 401: access denied for '$risUser'. Add role 'Standard RealtimeAndTraceCollection' or 'Standard CCM Admin Users' in CUCM > User Management." }
+                        403     { throw "RisPort70 403: access forbidden for '$risUser'. Check roles in CUCM." }
+                        0       { throw "RisPort70 connection failed to ${risCucm}:8443 - $($risEx.Message)" }
                         default { throw "RisPort70 HTTP $risStatus - $($risEx.Message)" }
                     }
                 }
@@ -841,15 +841,15 @@ try {
                 $totalFound = if ($totalNode) { $totalNode.InnerText.Trim() } else { "0" }
 
                 if ([string]::IsNullOrWhiteSpace($ipFound)) {
-                    $risStatus2 = if ($devStatus) { $devStatus } else { "non enregistre" }
-                    Write-Log "axl/phoneip $([string]$body.sep) -> non enregistre (RisPort70 total=$totalFound statut=$risStatus2)"
+                    $risStatus2 = if ($devStatus) { $devStatus } else { "not registered" }
+                    Write-Log "axl/phoneip $([string]$body.sep) -> not registered (RisPort70 total=$totalFound status=$risStatus2)"
                     Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
                         ok           = $false
                         notRegistered = $true
                         sep          = [string]$body.sep
                         description  = $descFound
                         axlVersion   = $axlVerIp
-                        error        = "Telephone $([string]$body.sep) non enregistre sur CUCM (RisPort70 : $risStatus2)"
+                        error        = "Phone $([string]$body.sep) not registered on CUCM (RisPort70: $risStatus2)"
                     }
                     continue
                 }
@@ -870,11 +870,11 @@ try {
                 $raw = $reader.ReadToEnd(); $reader.Close()
                 $body = $raw | ConvertFrom-Json
 
-                if ([string]::IsNullOrWhiteSpace($body.cucm))       { throw "Le champ 'cucm' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.username))   { throw "Le champ 'username' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.password))   { throw "Le champ 'password' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.deviceName)) { throw "Le champ 'deviceName' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.userId))     { throw "Le champ 'userId' est requis." }
+                if ([string]::IsNullOrWhiteSpace($body.cucm))       { throw "Field 'cucm' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.username))   { throw "Field 'username' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.password))   { throw "Field 'password' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.deviceName)) { throw "Field 'deviceName' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.userId))     { throw "Field 'userId' is required." }
 
                 $axlVerProv = if ($body.axlVersion -and $body.axlVersion -ne "auto") { [string]$body.axlVersion } else {
                     (Get-AxlCucmVersion -Cucm $body.cucm -Username $body.username -Password $body.password).version
@@ -882,21 +882,21 @@ try {
                 $userTypeProv = if ($body.userType -eq "end") { "end" } else { "app" }
                 $provSteps    = @()
 
-                # Etape 1 : assigner le device a l'utilisateur (Application User ou End User)
+                # Step 1: assign device to user (Application User or End User)
                 Add-AxlDeviceToUser -Cucm $body.cucm -Username $body.username -Password $body.password `
                                     -UserId $body.userId -DeviceName $body.deviceName `
                                     -AxlVersion $axlVerProv -UserType $userTypeProv | Out-Null
-                $provSteps += "Assigne a l'utilisateur '$([string]$body.userId)'"
-                Write-Log "provision: $([string]$body.deviceName) -> assigne a '$([string]$body.userId)'"
+                $provSteps += "Assigned to user '$([string]$body.userId)'"
+                Write-Log "provision: $([string]$body.deviceName) -> assigned to '$([string]$body.userId)'"
 
-                # Etape 2a : activer SSH et web access via vendorConfig (PSC) + configurer sshUserId
-                # NOTE CUCM 11.5 : <sshAccess>/<webAccess> en champ de haut niveau sont ignores silencieusement
-                # NOTE CUCM 11.5 : <sshPassword> dans updatePhone est ignore silencieusement (bug AXL)
+                # Step 2a: enable SSH and web access via vendorConfig (PSC) + configure sshUserId
+                # NOTE CUCM 11.5: <sshAccess>/<webAccess> at top-level field are silently ignored
+                # NOTE CUCM 11.5: <sshPassword> in updatePhone is silently ignored (AXL bug)
                 $devSafe      = [System.Security.SecurityElement]::Escape([string]$body.deviceName)
                 $sshUser      = if (-not [string]::IsNullOrWhiteSpace($body.phoneSshUser)) { [System.Security.SecurityElement]::Escape([string]$body.phoneSshUser) } else { "" }
                 $sshPass      = if (-not [string]::IsNullOrWhiteSpace($body.phoneSshPass)) { [string]$body.phoneSshPass } else { "" }
                 $sshUserBlock = if ($sshUser -ne "") { "<sshUserId>$sshUser</sshUserId>" } else { "" }
-                # <sshPassword> en clair : accepte par CUCM 15.0+, ignore silencieusement par CUCM 11.5 (le SQL prend le relais en etape 2b)
+                # <sshPassword> in plain text: accepted by CUCM 15.0+, silently ignored by CUCM 11.5 (SQL handles it in step 2b)
                 $sshPassEsc   = [System.Security.SecurityElement]::Escape($sshPass)
                 $sshPassBlock = if ($sshPass -ne "") { "<sshPassword>$sshPassEsc</sshPassword>" } else { "" }
                 $updateBody = @"
@@ -912,8 +912,8 @@ try {
 "@
                 Invoke-AxlRequest -Cucm $body.cucm -Username $body.username -Password $body.password `
                                   -SoapAction "updatePhone" -SoapBody $updateBody -AxlVersion $axlVerProv | Out-Null
-                $stepWeb = "SSH et Web access actives dans vendorConfig"
-                if ($sshUser -ne "") { $stepWeb += ", SSH user '$([string]$body.phoneSshUser)' configure" }
+                $stepWeb = "SSH and Web access enabled in vendorConfig"
+                if ($sshUser -ne "") { $stepWeb += ", SSH user '$([string]$body.phoneSshUser)' configured" }
                 $provSteps += $stepWeb
                 Write-Log "provision: $([string]$body.deviceName) -> $stepWeb"
 
@@ -925,12 +925,12 @@ try {
                     $sshUserSql  = ([string]$body.phoneSshUser) -replace "'", "''"
                     $sshPassSql  = ([string]$body.phoneSshPass) -replace "'", "''"
 
-                    # Hashes connus pour les mots de passe standards (CUCM 11.5)
+                    # Known hashes for standard passwords (CUCM 11.5)
                     $knownHashes = @{
                         "postpost" = "5b872c9608e4eb787b79c8495d65b5dd2a4d0a9a8921e86886a4dfeb83660fbb"
                     }
 
-                    # Tentative 1 : copier depuis un telephone reference ayant deja le meme sshuserid
+                    # Attempt 1: copy from a reference phone that already has the same sshuserid
                     $sqlPassBody = @"
     <ns:executeSQLUpdate>
       <sql>UPDATE device SET sshpassword = (SELECT FIRST 1 sshpassword FROM device d2 WHERE d2.sshuserid = '$sshUserSql' AND d2.sshpassword IS NOT NULL AND d2.sshpassword != '' AND d2.name != '$devSafeSql') WHERE name = '$devSafeSql'</sql>
@@ -944,14 +944,14 @@ try {
                         $rowsN = if ($rows.Count -gt 0) { [int]$rows[0].InnerText } else { 0 }
                         if ($rowsN -gt 0) {
                             $passConfigured = $true
-                            $provSteps += "Mot de passe SSH configure (depuis reference)"
-                            Write-Log "provision: $([string]$body.deviceName) -> sshpassword copie depuis telephone reference"
+                            $provSteps += "SSH password configured (from reference phone)"
+                            Write-Log "provision: $([string]$body.deviceName) -> sshpassword copied from reference phone"
                         }
                     } catch {
-                        Write-Log "WARN provision: $([string]$body.deviceName) -> echec SQL reference: $_"
+                        Write-Log "WARN provision: $([string]$body.deviceName) -> SQL reference failed: $_"
                     }
 
-                    # Tentative 2 : hash connu pour ce mot de passe (fallback si aucun telephone reference)
+                    # Attempt 2: known hash for this password (fallback if no reference phone)
                     if (-not $passConfigured) {
                         $knownHash = $knownHashes[[string]$body.phoneSshPass]
                         if ($knownHash) {
@@ -967,21 +967,21 @@ try {
                                 $rowsN2 = if ($rows2.Count -gt 0) { [int]$rows2[0].InnerText } else { 0 }
                                 if ($rowsN2 -gt 0) {
                                     $passConfigured = $true
-                                    $provSteps += "Mot de passe SSH configure (hash connu)"
-                                    Write-Log "provision: $([string]$body.deviceName) -> sshpassword defini via hash connu"
+                                    $provSteps += "SSH password configured (known hash)"
+                                    Write-Log "provision: $([string]$body.deviceName) -> sshpassword set via known hash"
                                 } else {
-                                    Write-Log "WARN provision: $([string]$body.deviceName) -> sshpassword hash connu rowsUpdated=0"
+                                    Write-Log "WARN provision: $([string]$body.deviceName) -> sshpassword known hash rowsUpdated=0"
                                 }
                             } catch {
-                                Write-Log "WARN provision: $([string]$body.deviceName) -> echec SQL hash connu: $_"
+                                Write-Log "WARN provision: $([string]$body.deviceName) -> SQL known hash failed: $_"
                             }
                         } else {
-                            Write-Log "WARN provision: $([string]$body.deviceName) -> mot de passe SSH non configure (aucun reference ni hash connu pour ce mot de passe)"
+                            Write-Log "WARN provision: $([string]$body.deviceName) -> SSH password not configured (no reference phone or known hash for this password)"
                         }
                     }
                 }
 
-                # Etape 3 : reset du telephone (redemarrage, pas factory reset)
+                # Step 3: phone reset (reboot, not factory reset)
                 $resetBody = @"
     <ns:doDeviceReset>
       <deviceName>$devSafe</deviceName>
@@ -990,8 +990,8 @@ try {
 "@
                 Invoke-AxlRequest -Cucm $body.cucm -Username $body.username -Password $body.password `
                                   -SoapAction "doDeviceReset" -SoapBody $resetBody -AxlVersion $axlVerProv | Out-Null
-                $provSteps += "Reset envoye (redemarrage en cours)"
-                Write-Log "provision: $([string]$body.deviceName) -> reset envoye"
+                $provSteps += "Reset sent (reboot in progress)"
+                Write-Log "provision: $([string]$body.deviceName) -> reset sent"
 
                 Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
                     ok         = $true
@@ -1008,11 +1008,11 @@ try {
                 $raw = $reader.ReadToEnd(); $reader.Close()
                 $body = $raw | ConvertFrom-Json
 
-                if ([string]::IsNullOrWhiteSpace($body.cucm))       { throw "Le champ 'cucm' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.username))   { throw "Le champ 'username' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.password))   { throw "Le champ 'password' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.deviceName)) { throw "Le champ 'deviceName' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.userId))     { throw "Le champ 'userId' est requis." }
+                if ([string]::IsNullOrWhiteSpace($body.cucm))       { throw "Field 'cucm' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.username))   { throw "Field 'username' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.password))   { throw "Field 'password' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.deviceName)) { throw "Field 'deviceName' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.userId))     { throw "Field 'userId' is required." }
 
                 $axlVer2 = if ($body.axlVersion -and $body.axlVersion -ne "auto") { [string]$body.axlVersion } else {
                     (Get-AxlCucmVersion -Cucm $body.cucm -Username $body.username -Password $body.password).version
@@ -1034,22 +1034,22 @@ try {
                 $raw = $reader.ReadToEnd(); $reader.Close()
                 $body = $raw | ConvertFrom-Json
 
-                if ([string]::IsNullOrWhiteSpace($body.ip))          { throw "Le champ 'ip' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.sshUser))     { throw "Le champ 'sshUser' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.sshPass))     { throw "Le champ 'sshPass' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.consoleUser)) { throw "Le champ 'consoleUser' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.consolePass)) { throw "Le champ 'consolePass' est requis." }
-                if ([string]::IsNullOrWhiteSpace($body.command))     { throw "Le champ 'command' est requis." }
+                if ([string]::IsNullOrWhiteSpace($body.ip))          { throw "Field 'ip' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.sshUser))     { throw "Field 'sshUser' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.sshPass))     { throw "Field 'sshPass' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.consoleUser)) { throw "Field 'consoleUser' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.consolePass)) { throw "Field 'consolePass' is required." }
+                if ([string]::IsNullOrWhiteSpace($body.command))     { throw "Field 'command' is required." }
 
-                # Connexion SSH Cisco 8800 : sans PTY (-batch), le telephone presente une console serie
-                # Sequence : SSH(post/postpost) -> console serie(debug/debug) -> commande -> exit
+                # SSH connection to Cisco 8800: without PTY (-batch), the phone presents a serial console
+                # Sequence: SSH(post/postpost) -> serial console(debug/debug) -> command -> exit
                 $plinkArgs = "-ssh -batch -l $([string]$body.sshUser) -pw $([string]$body.sshPass)"
                 if (-not [string]::IsNullOrWhiteSpace($body.sshHostKey)) {
                     # Cle connue : utiliser -hostkey pour eviter le prompt (mode -batch strict)
                     $plinkArgs += " -hostkey `"$([string]$body.sshHostKey)`""
                 }
-                # Si sshHostKey vide : utiliser le cache registre PuTTY (HKCU\Software\SimonTatham\PuTTY\SshHostKeys)
-                # En mode -batch, plink echoue si la cle n'est pas en cache → message clair retourne
+                # If sshHostKey is empty: use PuTTY registry cache (HKCU\Software\SimonTatham\PuTTY\SshHostKeys)
+                # In -batch mode, plink fails if key is not cached -> clear error message returned
                 $plinkArgs += " $([string]$body.ip)"
 
                 $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -1065,15 +1065,15 @@ try {
                 $sshProc = [System.Diagnostics.Process]::Start($psi)
                 $outTask = $sshProc.StandardOutput.ReadToEndAsync()
 
-                # Attendre invite login console serie
+                # Wait for serial console login prompt
                 [System.Threading.Thread]::Sleep(1800)
                 $sshProc.StandardInput.WriteLine([string]$body.consoleUser)
                 [System.Threading.Thread]::Sleep(1200)
                 $sshProc.StandardInput.WriteLine([string]$body.consolePass)
-                # Attendre prompt DEBUG>
+                # Wait for DEBUG> prompt
                 [System.Threading.Thread]::Sleep(2500)
                 $sshProc.StandardInput.WriteLine([string]$body.command)
-                # Attendre la sortie de la commande
+                # Wait for command output
                 [System.Threading.Thread]::Sleep(4000)
                 $sshProc.StandardInput.WriteLine("exit")
                 $sshProc.StandardInput.Close()
@@ -1081,10 +1081,10 @@ try {
                 if (-not $sshProc.WaitForExit(15000)) { $sshProc.Kill() }
                 $rawOutput = $outTask.GetAwaiter().GetResult()
 
-                # Nettoyer sequences ANSI et caracteres de controle
+                # Clean ANSI sequences and control characters
                 $cleanOutput = [regex]::Replace($rawOutput, '(\x1B\[[0-9;]*[A-Za-z]|\x1B[()][A-Z0-9]|\r|\x00)', '')
 
-                # Extraire uniquement la sortie de la commande (entre l'echo "DEBUG> cmd" et le prochain "DEBUG>")
+                # Extract only the command output (between echo "DEBUG> cmd" and next "DEBUG>")
                 $cmdEcho = "DEBUG> $([string]$body.command)"
                 $inResult = $false
                 $resultLines = [System.Collections.Generic.List[string]]::new()
@@ -1100,13 +1100,13 @@ try {
                 }
 
                 $outputStr = ($resultLines | Where-Object { $_ -ne "" }) -join "`n"
-                # Si extraction echoue (echo non trouve), retourner la sortie brute nettoyee
+        # If extraction fails (echo not found), return raw cleaned output
                 if ([string]::IsNullOrWhiteSpace($outputStr)) {
                     $outputStr = ($cleanOutput -split '\n' | Where-Object { $_.Trim() }) -join "`n"
                 }
 
                 if ([string]::IsNullOrWhiteSpace($outputStr)) {
-                    throw "SSH echoue : aucune reponse du telephone. Verifier IP, credentials et que SSH est active."
+                    throw "SSH failed: no response from phone. Check IP, credentials and that SSH is enabled."
                 }
 
                 Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
@@ -1119,14 +1119,14 @@ try {
 
             Write-JsonResponse -Response $response -StatusCode 404 -Payload @{
                 ok = $false
-                error = "Route non trouvee."
+                error = "Route not found."
             }
         } catch [System.Net.HttpListenerException] {
             if (-not $listener.IsListening) { break }
             continue
         } catch {
             $errMsg = $_.Exception.Message
-            Write-Log "ERREUR: $errMsg"
+            Write-Log "ERROR: $errMsg"
             if ($null -ne $response) {
                 try {
                     Write-JsonResponse -Response $response -StatusCode 400 -Payload @{
@@ -1134,7 +1134,7 @@ try {
                         error = $errMsg
                     }
                 } catch {
-                    Write-Log "Impossible d'envoyer la reponse d'erreur: $($_.Exception.Message)"
+                    Write-Log "Failed to send error response: $($_.Exception.Message)"
                     try { $response.OutputStream.Close() } catch {}
                 }
             }
@@ -1144,5 +1144,5 @@ try {
 finally {
     $listener.Stop()
     $listener.Close()
-    Write-Log "Serveur arrete."
+    Write-Log "Server stopped."
 }

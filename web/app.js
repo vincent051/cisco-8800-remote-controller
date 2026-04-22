@@ -1,4 +1,4 @@
-﻿// ---- References DOM ----
+﻿// ---- DOM References ----
 const el = {
   phoneList:       document.getElementById("phoneList"),
   targetIp:        document.getElementById("targetIp"),
@@ -15,11 +15,11 @@ const el = {
   sshOutput:       document.getElementById("sshOutput")
 };
 
-// ---- Map SEP name -> phone config (issu de phones.json) ----
+// ---- Map SEP name -> phone config (from phones.json) ----
 var phonesMap = {};
 var currentPhoneSep = "";
 
-// ---- Onglets ----
+// ---- Tabs ----
 document.querySelectorAll(".tab-btn").forEach(function(btn) {
   btn.addEventListener("click", function() {
     document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
@@ -29,13 +29,13 @@ document.querySelectorAll(".tab-btn").forEach(function(btn) {
   });
 });
 
-// ---- Splitters redimensionnables ----
+// ---- Resizable splitters ----
 function initSplitter(splitterId, leftId, rightId, defaultFraction) {
   var splitter = document.getElementById(splitterId);
   var leftEl   = document.getElementById(leftId);
   var rightEl  = document.getElementById(rightId);
   if (!splitter || !leftEl || !rightEl) return;
-  // Largeur initiale : fraction du conteneur parent
+  // Initial width: fraction of parent container
   var frac = (defaultFraction != null) ? defaultFraction : null;
   if (frac != null) {
     var parent = leftEl.parentElement;
@@ -74,13 +74,13 @@ function initSplitter(splitterId, leftId, rightId, defaultFraction) {
 initSplitter("splitterCtrl", "ctrlScreenCol", "ctrlControlsCol", 0.5);
 initSplitter("splitterAxl",  "axlSidebar",    "axlPanel");
 
-// ---- Etat auto-refresh ----
+// ---- Auto-refresh state ----
 let autoRefreshActive = false;
 let screenshotFailCount = 0;
 var SCREENSHOT_MAX_FAILS = 15;
 
-// ---- Provisioning en attente de retour telephonique ----
-// { sep, ip } : mis a jour apres un doDeviceReset, efface quand screenshot OK
+// ---- Pending provisioning (waiting for phone reboot) ----
+// { sep, ip }: updated after doDeviceReset, cleared when screenshot is OK
 var provisioningPending = null;
 
 // ---- Utilitaires ----
@@ -95,14 +95,14 @@ function addLog(message) {
   el.log.textContent = "[" + stamp + "] " + message + "\n" + el.log.textContent;
 }
 
-// ---- Chargement telephones ----
+// ---- Phone list loading ----
 async function loadPhones() {
   try {
     var res = await fetch("/api/phones");
     if (!res.ok) throw new Error("HTTP " + res.status);
     var phones = await res.json();
 
-    // Construire le map SEP -> phone
+    // Build SEP -> phone map
     phonesMap = {};
     phones.forEach(function(p) {
       if (p.sep) phonesMap[p.sep.toLowerCase()] = p;
@@ -111,7 +111,7 @@ async function loadPhones() {
     el.phoneList.innerHTML = "";
     var ph = document.createElement("option");
     ph.value = "";
-    ph.textContent = "Choisir un telephone...";
+    ph.textContent = "Choose a phone...";
     el.phoneList.appendChild(ph);
 
     phones.forEach(function(p) {
@@ -130,11 +130,11 @@ async function loadPhones() {
       el.phoneList.dispatchEvent(new Event("change"));
     }
   } catch (err) {
-    setStatus("Impossible de charger la liste : " + err.message, false);
+    setStatus("Failed to load phone list: " + err.message, false);
   }
 }
 
-// Rafraichit uniquement phonesMap sans reconstruire le dropdown
+// Refreshes phonesMap only without rebuilding the dropdown
 async function refreshPhonesMap() {
   try {
     var res = await fetch("/api/phones?t=" + Date.now());
@@ -142,7 +142,7 @@ async function refreshPhonesMap() {
     var phones = await res.json();
     phonesMap = {};
     phones.forEach(function(p) { if (p.sep) phonesMap[p.sep.toLowerCase()] = p; });
-  } catch (e) { /* silencieux */ }
+  } catch (e) { /* silent */ }
 }
 
 el.phoneList.addEventListener("change", function() {
@@ -159,13 +159,13 @@ el.phoneList.addEventListener("change", function() {
   }
 });
 
-// ---- Basculer vers l'onglet Contrôleur avec un téléphone AXL ----
+// ---- Switch to Controller tab with an AXL phone ----
 async function switchToControllerWithPhone(sepName) {
-  // Toujours rafraichir phonesMap depuis phones.json (le fichier peut avoir change)
+  // Always refresh phonesMap from phones.json (file may have changed)
   await refreshPhonesMap();
   var phone = phonesMap[sepName.toLowerCase()];
 
-  // Activer l'onglet Contrôleur
+  // Switch to Controller tab
   document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
   document.querySelectorAll(".tab-pane").forEach(function(p) { p.classList.remove("active"); });
   document.querySelector('.tab-btn[data-tab="tab-controller"]').classList.add("active");
@@ -182,20 +182,20 @@ async function switchToControllerWithPhone(sepName) {
     document.getElementById("activePhoneName").textContent = sepName;
     document.getElementById("activePhoneIp").textContent = phone.ip;
     document.getElementById("activePhoneBar").querySelector(".active-phone-icon").textContent = "📱";
-    setStatus("Téléphone actif : " + phone.ip, true);
-    addLog("Contrôle de " + sepName + " (" + phone.ip + ")");
+    setStatus("Active phone: " + phone.ip, true);
+    addLog("Controlling " + sepName + " (" + phone.ip + ")");
 
     // Démarrer l'auto-refresh
     var btn = document.getElementById("btnAutoRefresh");
     autoRefreshActive = true;
-    btn.textContent = "Auto-refresh : ON";
+    btn.textContent = "Auto-refresh: ON";
     btn.classList.add("active-btn");
     screenshotFailCount = 0;
     refreshScreenshot();
   } else {
-    // Téléphone inconnu → résolution automatique via AXL SQL
+    // Unknown phone -> automatic resolution via AXL
     document.getElementById("activePhoneName").textContent = sepName;
-    document.getElementById("activePhoneIp").textContent = "Résolution\u2026";
+    document.getElementById("activePhoneIp").textContent = "Resolving\u2026";
     document.getElementById("activePhoneBar").querySelector(".active-phone-icon").textContent = "\u23F3";
     var resolved = await autoAddPhoneFromAxl(sepName);
     if (resolved) {
@@ -208,11 +208,11 @@ async function switchToControllerWithPhone(sepName) {
         document.getElementById("activePhoneName").textContent = sepName;
         document.getElementById("activePhoneIp").textContent = p.ip;
         document.getElementById("activePhoneBar").querySelector(".active-phone-icon").textContent = "\uD83D\uDCF1";
-        setStatus("Téléphone ajouté automatiquement : " + p.ip, true);
-        addLog("Contrôle de " + sepName + " (" + p.ip + ")");
+        setStatus("Phone automatically added: " + p.ip, true);
+        addLog("Controlling " + sepName + " (" + p.ip + ")");
         var btnAr = document.getElementById("btnAutoRefresh");
         autoRefreshActive = true;
-        btnAr.textContent = "Auto-refresh : ON";
+        btnAr.textContent = "Auto-refresh: ON";
         btnAr.classList.add("active-btn");
         screenshotFailCount = 0;
         refreshScreenshot();
@@ -221,20 +221,20 @@ async function switchToControllerWithPhone(sepName) {
   }
 }
 
-// ---- Envoi commandes ----
+// ---- Send commands ----
 async function sendCommand(payload, title) {
   if (!el.targetIp.value.trim()) {
-    setStatus("Renseigne une IP cible.", false);
+    setStatus("Enter a target IP.", false);
     return;
   }
-  // Suspendre l'auto-refresh pendant la commande (serveur mono-thread)
+  // Pause auto-refresh during command (single-threaded server)
   var wasAutoRefresh = autoRefreshActive;
   autoRefreshActive = false;
 
   var body = { ip: el.targetIp.value.trim(), username: el.username.value, password: el.password.value };
   Object.keys(payload).forEach(function(k) { body[k] = payload[k]; });
   try {
-    setStatus("Envoi : " + title + "...", true);
+    setStatus("Sending: " + title + "...", true);
     var res = await fetch("/api/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -242,14 +242,14 @@ async function sendCommand(payload, title) {
     });
     var data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
-    setStatus("OK : " + title, true);
+    setStatus("OK: " + title, true);
     addLog(title + " -> " + data.phoneResponseStatus);
-    // Reprendre l'auto-refresh et rafraichir pour voir l'effet
+    // Resume auto-refresh and refresh to see the effect
     autoRefreshActive = wasAutoRefresh;
     setTimeout(refreshScreenshot, 400);
   } catch (err) {
-    setStatus("Erreur : " + err.message, false);
-    addLog(title + " -> ECHEC (" + err.message + ")");
+    setStatus("Error: " + err.message, false);
+    addLog(title + " -> FAILED (" + err.message + ")");
     autoRefreshActive = wasAutoRefresh;
   }
 }
@@ -266,7 +266,7 @@ function buildScreenshotUrl() {
 
 function refreshScreenshot() {
   var url = buildScreenshotUrl();
-  if (!url) { setStatus("Renseigne une IP cible pour le screenshot.", false); return; }
+  if (!url) { setStatus("Enter a target IP for the screenshot.", false); return; }
   el.screenshotError.style.display = "none";
   el.screenshot.src = url;
 }
@@ -276,9 +276,9 @@ function scheduleNextRefresh() {
   if (screenshotFailCount >= SCREENSHOT_MAX_FAILS) {
     autoRefreshActive = false;
     var btn = document.getElementById("btnAutoRefresh");
-    btn.textContent = "Auto-refresh : OFF";
+    btn.textContent = "Auto-refresh: OFF";
     btn.classList.remove("active-btn");
-    el.screenshotError.textContent = "Auto-refresh stoppe apres " + SCREENSHOT_MAX_FAILS + " echecs. Verifier IP/credentials.";
+    el.screenshotError.textContent = "Auto-refresh stopped after " + SCREENSHOT_MAX_FAILS + " failures. Check IP/credentials.";
     el.screenshotError.style.display = "block";
     return;
   }
@@ -290,14 +290,14 @@ el.screenshot.addEventListener("load", function() {
   el.screenshot.style.display = "block";
   el.screenshotError.style.display = "none";
   screenshotFailCount = 0;
-  // Mise a jour du statut apres retour telephonique post-reset
+  // Update status after phone comes back online post-reset
   if (provisioningPending && provisioningPending.sep === currentPhoneSep) {
     var pSep = provisioningPending.sep;
     var pIp  = provisioningPending.ip;
     provisioningPending = null;
     document.getElementById("activePhoneIp").textContent = pIp;
-    setStatus("Téléphone de nouveau enregistré : " + escHtml(pIp), true);
-    addLog(pSep.toUpperCase() + " de retour en ligne ("+pIp+")");
+    setStatus("Phone back online: " + escHtml(pIp), true);
+    addLog(pSep.toUpperCase() + " back online ("+pIp+")");
   }
   scheduleNextRefresh();
 });
@@ -306,7 +306,7 @@ el.screenshot.addEventListener("error", function() {
   screenshotFailCount++;
   el.screenshot.style.display = "none";
   el.screenshotError.style.display = "block";
-  el.screenshotError.textContent = "Erreur screenshot (" + screenshotFailCount + "/" + SCREENSHOT_MAX_FAILS + ") - verifier IP/credentials.";
+  el.screenshotError.textContent = "Screenshot error (" + screenshotFailCount + "/" + SCREENSHOT_MAX_FAILS + ") - check IP/credentials.";
   scheduleNextRefresh();
 });
 
@@ -322,12 +322,12 @@ document.getElementById("btnRefreshNow").addEventListener("click", function() {
 document.getElementById("btnAutoRefresh").addEventListener("click", function() {
   autoRefreshActive = !autoRefreshActive;
   if (autoRefreshActive) {
-    this.textContent = "Auto-refresh : ON";
+    this.textContent = "Auto-refresh: ON";
     this.classList.add("active-btn");
     screenshotFailCount = 0;
     refreshScreenshot();
   } else {
-    this.textContent = "Auto-refresh : OFF";
+    this.textContent = "Auto-refresh: OFF";
     this.classList.remove("active-btn");
   }
 });
@@ -347,14 +347,14 @@ document.getElementById("btnXml").addEventListener("click", function() {
   sendCommand({ mode: "xml", value: el.customXml.value }, "XML custom");
 });
 
-// ---- File de touches (debounce 2s) ----
+// ---- Key queue (2s debounce) ----
 var keyQueue = [];
 var keyFlushTimer = null;
 
 function enqueueKey(key) {
   keyQueue.push(key);
   if (keyQueue.length > 1) {
-    addLog("File d'attente : " + keyQueue.join(" → "));
+    addLog("Queue: " + keyQueue.join(" → "));
   }
   if (keyFlushTimer) clearTimeout(keyFlushTimer);
   keyFlushTimer = setTimeout(flushKeyQueue, 2000);
@@ -367,7 +367,7 @@ async function flushKeyQueue() {
   keyQueue = [];
 
   if (!el.targetIp.value.trim()) {
-    setStatus("Renseigne une IP cible.", false);
+    setStatus("Enter a target IP.", false);
     return;
   }
 
@@ -385,9 +385,9 @@ async function flushKeyQueue() {
     };
     try {
       if (keys.length > 1) {
-        setStatus("Envoi " + (i + 1) + "/" + keys.length + " : Key:" + key, true);
+        setStatus("Sending " + (i + 1) + "/" + keys.length + ": Key:" + key, true);
       } else {
-        setStatus("Envoi : Key:" + key + "...", true);
+        setStatus("Sending: Key:" + key + "...", true);
       }
       var res = await fetch("/api/execute", {
         method: "POST",
@@ -397,27 +397,27 @@ async function flushKeyQueue() {
       var data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
       addLog("Key:" + key + " -> " + data.phoneResponseStatus);
-      // Pause inter-touche pour que le telephone traite chaque digit correctement
+      // Inter-key pause so the phone processes each digit correctly
       if (i < keys.length - 1) {
         await new Promise(function(r) { setTimeout(r, 150); });
       }
     } catch (err) {
-      setStatus("Erreur Key:" + key + " : " + err.message, false);
-      addLog("Key:" + key + " -> ECHEC (" + err.message + ")");
+      setStatus("Error Key:" + key + ": " + err.message, false);
+      addLog("Key:" + key + " -> FAILED (" + err.message + ")");
     }
   }
 
   if (keys.length > 1) {
-    setStatus("OK : " + keys.length + " touches envoyées", true);
+    setStatus("OK: " + keys.length + " keys sent", true);
   } else {
-    setStatus("OK : Key:" + keys[0], true);
+    setStatus("OK: Key:" + keys[0], true);
   }
 
   autoRefreshActive = wasAutoRefresh;
   setTimeout(refreshScreenshot, 400);
 }
 
-// ---- Clavier complet ----
+// ---- Full keyboard ----
 document.querySelectorAll("[data-key]").forEach(function(btn) {
   btn.addEventListener("click", function() {
     var key = btn.getAttribute("data-key");
@@ -454,7 +454,7 @@ function axlGetCreds() {
   };
 }
 
-// Met a jour le label userId selon le type choisi
+// Updates userId label based on selected type
 document.getElementById("axlUserType").addEventListener("change", function() {
   var lbl = document.getElementById("axlCtrlUserLabel");
   lbl.textContent = this.value === "app" ? "Application User (userId)" : "End User (userId)";
@@ -484,14 +484,14 @@ var axlAllPhones = [];
 
 async function axlListPhones() {
   var creds = axlGetCreds();
-  if (!creds.cucm) { axlSetStatus("Renseigne l'IP/FQDN CUCM.", false); return; }
+  if (!creds.cucm) { axlSetStatus("Enter the CUCM IP/FQDN.", false); return; }
 
-  axlSetStatus("Connexion AXL...", true);
+  axlSetStatus("Connecting to AXL...", true);
   document.getElementById("btnAxlList").disabled = true;
 
   try {
     if (creds.axlVersion === "auto") {
-      axlSetStatus("Detection version CUCM...", true);
+      axlSetStatus("Detecting CUCM version...", true);
       creds.axlVersion = await axlDetectVersion(creds);
     }
     var res = await fetch("/api/axl/phones", {
@@ -505,9 +505,9 @@ async function axlListPhones() {
     var rawPhones = data.phones;
     axlAllPhones = Array.isArray(rawPhones) ? rawPhones : (rawPhones ? [rawPhones] : []);
     axlApplyFilters(creds);
-    axlSetStatus(axlAllPhones.length + " téléphone(s) trouvé(s).", true);
+    axlSetStatus(axlAllPhones.length + " phone(s) found.", true);
   } catch (err) {
-    axlSetStatus("Erreur : " + err.message, false);
+    axlSetStatus("Error: " + err.message, false);
   } finally {
     document.getElementById("btnAxlList").disabled = false;
   }
@@ -535,7 +535,7 @@ function axlApplyFilters(creds) {
 function axlRenderTable(phones, creds) {
   var tbody = document.getElementById("axlTableBody");
   if (!phones.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="axl-empty">Aucun téléphone trouvé.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="axl-empty">No phones found.</td></tr>';
     return;
   }
   tbody.innerHTML = phones.map(function(p) {
@@ -551,7 +551,7 @@ function axlRenderTable(phones, creds) {
       '<td>' + escHtml(p.devicePool || "—") + '</td>' +
       '<td class="axl-mono">' + escHtml(p.ip || "—") + '</td>' +
       '<td>' + badge + '</td>' +
-      '<td><button class="btn-control" data-device="' + escHtml(p.name) + '">🎮 Contrôle</button></td>' +
+      '<td><button class="btn-control" data-device="' + escHtml(p.name) + '">🎮 Control</button></td>' +
       '</tr>';
   }).join("");
 
@@ -564,11 +564,11 @@ function axlRenderTable(phones, creds) {
 
 async function axlAssignPhone(deviceName, btn) {
   var creds = axlGetCreds();
-  if (!creds.userId) { axlSetStatus("Renseigne le nom d'utilisateur cible.", false); return; }
+  if (!creds.userId) { axlSetStatus("Enter the target user name.", false); return; }
 
   btn.disabled = true;
   btn.textContent = "...";
-  axlSetStatus("Assignation de " + deviceName + " à " + creds.userId + "...", true);
+  axlSetStatus("Assigning " + deviceName + " to " + creds.userId + "...", true);
 
   try {
     var res = await fetch("/api/axl/assign", {
@@ -586,13 +586,13 @@ async function axlAssignPhone(deviceName, btn) {
     });
     var data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
-    btn.textContent = "✓ Assigné";
+    btn.textContent = "\u2713 Assigned";
     btn.classList.add("btn-assigned");
-    axlSetStatus(deviceName + " assigné à " + creds.userId + ".", true);
+    axlSetStatus(deviceName + " assigned to " + creds.userId + ".", true);
   } catch (err) {
     btn.disabled = false;
-    btn.textContent = "Contrôle";
-    axlSetStatus("Erreur : " + err.message, false);
+    btn.textContent = "Control";
+    axlSetStatus("Error: " + err.message, false);
   }
 }
 
@@ -602,9 +602,9 @@ function escHtml(str) {
 
 // ---- SSH ----
 function getSshCredsForCurrentPhone() {
-  // 1. Chercher par SEP courant (le plus fiable)
+  // 1. Look up by current SEP (most reliable)
   if (currentPhoneSep && phonesMap[currentPhoneSep]) return phonesMap[currentPhoneSep];
-  // 2. Chercher par IP (fallback pour sélection manuelle)
+  // 2. Look up by IP (fallback for manual selection)
   var ip = el.targetIp.value.trim();
   for (var key in phonesMap) {
     if (phonesMap[key].ip === ip) return phonesMap[key];
@@ -614,19 +614,19 @@ function getSshCredsForCurrentPhone() {
 
 async function runSshCommand(command) {
   var ip = el.targetIp.value.trim();
-  if (!ip) { el.sshOutput.textContent = "Renseigne une IP cible."; return; }
+  if (!ip) { el.sshOutput.textContent = "Enter a target IP."; return; }
 
   var phone = getSshCredsForCurrentPhone();
   if (!phone || !phone.sshUser || !phone.consoleUser) {
-    el.sshOutput.textContent = "Credentials SSH non configurés dans phones.json (sshUser/sshPass/consoleUser/consolePass requis).";
+    el.sshOutput.textContent = "SSH credentials not configured in phones.json (sshUser/sshPass/consoleUser/consolePass required).";
     return;
   }
 
   var btnSsh = document.getElementById("btnSsh");
   btnSsh.disabled = true;
-  el.sshOutput.textContent = "Exécution en cours...";
+  el.sshOutput.textContent = "Running...";
 
-  // Suspendre l'auto-refresh pendant SSH (serveur mono-thread)
+  // Pause auto-refresh during SSH (single-threaded server)
   var wasAutoRefresh = autoRefreshActive;
   autoRefreshActive = false;
 
@@ -646,11 +646,11 @@ async function runSshCommand(command) {
     });
     var data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
-    el.sshOutput.textContent = data.output || "(pas de sortie)";
+    el.sshOutput.textContent = data.output || "(no output)";
     addLog("SSH: " + command);
   } catch (err) {
-    el.sshOutput.textContent = "Erreur : " + err.message;
-    addLog("SSH: " + command + " -> ECHEC (" + err.message + ")");
+    el.sshOutput.textContent = "Error: " + err.message;
+    addLog("SSH: " + command + " -> FAILED (" + err.message + ")");
   } finally {
     btnSsh.disabled = false;
     if (wasAutoRefresh) {
@@ -683,16 +683,16 @@ document.querySelectorAll(".axl-search").forEach(function(inp) {
 });
 
 // ================================================================
-// ---- Provisioning + contrôle depuis le tableau AXL ----
+// ---- Provisioning + control from AXL table ----
 // ================================================================
 async function axlProvisionAndControl(sepName) {
   var axlCreds = axlGetCreds();
   if (!axlCreds.cucm || !axlCreds.username) {
-    setStatus(escHtml(sepName) + " : credentials AXL requis pour le provisioning.", false);
+    setStatus(escHtml(sepName) + ": AXL credentials required for provisioning.", false);
     return;
   }
 
-  // Basculer vers l'onglet contrôleur
+  // Switch to Controller tab
   document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
   document.querySelectorAll(".tab-pane").forEach(function(p) { p.classList.remove("active"); });
   document.querySelector('.tab-btn[data-tab="tab-controller"]').classList.add("active");
@@ -706,7 +706,7 @@ async function axlProvisionAndControl(sepName) {
       axlCreds.axlVersion = await axlDetectVersion(axlCreds);
     }
 
-    // Etape 1 : résoudre l'IP AVANT le reset (téléphone encore enregistré)
+    // Step 1: resolve IP BEFORE reset (phone still registered)
     var ip = null;
     var description = "";
     var existingPhone = phonesMap[sepName.toLowerCase()];
@@ -714,7 +714,7 @@ async function axlProvisionAndControl(sepName) {
       ip = existingPhone.ip;
       description = existingPhone.description || "";
     } else {
-      setStatus("Résolution IP de " + escHtml(sepName) + "\u2026", true);
+      setStatus("Resolving IP for " + escHtml(sepName) + "\u2026", true);
       var ipRes = await fetch("/api/axl/phoneip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -725,15 +725,15 @@ async function axlProvisionAndControl(sepName) {
         ip = ipData.ip;
         description = ipData.description || "";
       } else if (ipData.notRegistered) {
-        var manualIp = window.prompt("Téléphone " + sepName + " non enregistré sur CUCM.\nEntrez l'adresse IP manuellement :", "");
+        var manualIp = window.prompt("Phone " + sepName + " not registered on CUCM.\nEnter the IP address manually:", "");
         if (manualIp && manualIp.trim()) { ip = manualIp.trim(); }
       } else {
         throw new Error(ipData.error || "Erreur résolution IP");
       }
     }
 
-    // Etape 2 : provision (assign + webAccess + SSH + reset)
-    setStatus("Provisioning " + escHtml(sepName) + " sur CUCM\u2026", true);
+    // Step 2: provision (assign + webAccess + SSH + reset)
+    setStatus("Provisioning " + escHtml(sepName) + " on CUCM\u2026", true);
     var provRes = await fetch("/api/axl/provision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -746,9 +746,9 @@ async function axlProvisionAndControl(sepName) {
     });
     var provData = await provRes.json();
     if (!provRes.ok || !provData.ok) throw new Error(provData.error || "Provision HTTP " + provRes.status);
-    addLog(sepName + " provisionné : " + (provData.steps || []).join(" | "));
+    addLog(sepName + " provisioned: " + (provData.steps || []).join(" | "));
 
-    // Etape 3 : ajouter dans phones.json si téléphone encore inconnu
+    // Step 3: add to phones.json if phone not yet known
     if (ip && !existingPhone) {
       var refPhone = Object.values(phonesMap)[0] || {};
       var addRes = await fetch("/api/phones/add", {
@@ -767,34 +767,34 @@ async function axlProvisionAndControl(sepName) {
     await loadPhones();
 
     if (!ip) {
-      setStatus(escHtml(sepName) + " provisionné (IP inconnue — reset en cours).", true);
-      document.getElementById("activePhoneIp").textContent = "IP inconnue";
+      setStatus(escHtml(sepName) + " provisioned (IP unknown - reset in progress).", true);
+      document.getElementById("activePhoneIp").textContent = "IP unknown";
       document.getElementById("activePhoneBar").querySelector(".active-phone-icon").textContent = "\u2753";
       return;
     }
 
-    // Etape 4 : basculer le contrôleur
+    // Step 4: switch controller
     var ctrlPhone = phonesMap[sepName.toLowerCase()] || existingPhone || {};
     el.targetIp.value = ip;
     el.username.value = ctrlPhone.username || "post";
     el.password.value = ctrlPhone.password || "";
     currentPhoneSep = sepName.toLowerCase();
     document.getElementById("activePhoneName").textContent = sepName;
-    document.getElementById("activePhoneIp").textContent = ip + " (reset\u2026)";
+    document.getElementById("activePhoneIp").textContent = ip + " (resetting\u2026)";
     document.getElementById("activePhoneBar").querySelector(".active-phone-icon").textContent = "\uD83D\uDCF1";
-    setStatus(escHtml(sepName) + " provisionné — reset en cours (~90s). IP : " + escHtml(ip), true);
-    addLog(sepName + " prêt : " + ip + " (reset envoyé, screenshot auto dans ~90s)");
+    setStatus(escHtml(sepName) + " provisioned - reset in progress (~90s). IP: " + escHtml(ip), true);
+    addLog(sepName + " ready: " + ip + " (reset sent, screenshot auto in ~90s)");
     provisioningPending = { sep: sepName.toLowerCase(), ip: ip };
     screenshotFailCount = 0;
     var arBtn = document.getElementById("btnAutoRefresh");
     autoRefreshActive = true;
-    arBtn.textContent = "Auto-refresh : ON";
+    arBtn.textContent = "Auto-refresh: ON";
     arBtn.classList.add("active-btn");
     refreshScreenshot();
   } catch (err) {
     document.getElementById("activePhoneBar").querySelector(".active-phone-icon").textContent = "\u2757";
-    setStatus(escHtml(sepName) + " : provision échoué — " + escHtml(err.message), false);
-    addLog(sepName + " : provision échoué (" + err.message + ")");
+    setStatus(escHtml(sepName) + ": provisioning failed - " + escHtml(err.message), false);
+    addLog(sepName + ": provisioning failed (" + err.message + ")");
   }
 }
 
