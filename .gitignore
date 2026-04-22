@@ -1,4 +1,5 @@
 phones.json
+cucm-connections.json
 
 # Fichiers temporaires et de debug
 $env:TEMP/axl_*.txt

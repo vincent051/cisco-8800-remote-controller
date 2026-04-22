@@ -764,3 +764,37 @@ button:active { transform: scale(0.97); }
   border-radius: 2px;
 }
 
+/* ── Saved CUCM connections ──────────────────── */
+.conn-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.conn-row select,
+.conn-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+.conn-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0 6px;
+}
+.btn-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 120ms, transform 80ms;
+}
+.btn-icon:hover  { filter: brightness(1.12); }
+.btn-icon:active { transform: scale(0.94); }
+.btn-danger  { background: var(--error, #e74c3c);  color: #fff; }
+.btn-green   { background: var(--green, #27ae60); color: #fff; }
+

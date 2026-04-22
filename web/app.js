@@ -460,6 +460,117 @@ document.getElementById("axlUserType").addEventListener("change", function() {
   lbl.textContent = this.value === "app" ? "Application User (userId)" : "End User (userId)";
 });
 
+// ---- Saved CUCM connections ----
+
+async function loadCucmConnections() {
+  try {
+    var res = await fetch("/api/cucm-connections");
+    var data = await res.json();
+    var sel = document.getElementById("axlConnSelect");
+    // Rebuild options without touching sel.value (avoids any browser change-event side effects)
+    while (sel.options.length > 0) sel.remove(0);
+    var def = document.createElement("option");
+    def.value = ""; def.textContent = "— select —";
+    sel.appendChild(def);
+    data.forEach(function(c) {
+      var opt = document.createElement("option");
+      opt.value = c.name;
+      opt.textContent = c.name;
+      sel.appendChild(opt);
+    });
+    // Caller is responsible for setting sel.value after this returns
+  } catch (e) { /* silent */ }
+}
+
+function fillFormFromConnection(conn) {
+  document.getElementById("axlCucm").value        = conn.cucm          || "";
+  document.getElementById("axlUser").value        = conn.username      || "";
+  document.getElementById("axlPass").value        = conn.password      || "";
+  document.getElementById("axlCtrlUser").value    = conn.userId        || "";
+  document.getElementById("axlUserType").value    = conn.userType      || "app";
+  document.getElementById("axlVersion").value     = conn.axlVersion    || "auto";
+  document.getElementById("axlPhoneSshUser").value  = conn.phoneSshUser  || "";
+  document.getElementById("axlPhoneSshPass").value  = conn.phoneSshPass  || "";
+  document.getElementById("axlPhoneHttpUser").value = conn.phoneHttpUser || "";
+  document.getElementById("axlPhoneHttpPass").value = conn.phoneHttpPass || "";
+  document.getElementById("axlConnName").value    = conn.name          || "";
+  // update userId label
+  var lbl = document.getElementById("axlCtrlUserLabel");
+  lbl.textContent = (conn.userType === "end") ? "End User (userId)" : "Application User (userId)";
+}
+
+document.getElementById("axlConnSelect").addEventListener("change", async function() {
+  var name = this.value;
+  if (!name) return;
+  try {
+    var res = await fetch("/api/cucm-connections");
+    var data = await res.json();
+    var conn = data.find(function(c) { return c.name === name; });
+    if (conn) fillFormFromConnection(conn);
+  } catch (e) { /* silent */ }
+});
+
+document.getElementById("btnConnSave").addEventListener("click", async function() {
+  var creds = axlGetCreds();
+  var name = document.getElementById("axlConnName").value.trim();
+  if (!name) { setStatus("Enter a connection name.", false); return; }
+  try {
+    var res = await fetch("/api/cucm-connections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name:          name,
+        cucm:          creds.cucm,
+        username:      creds.username,
+        password:      creds.password,
+        userId:        creds.userId,
+        userType:      creds.userType,
+        axlVersion:    creds.axlVersion,
+        phoneSshUser:  creds.phoneSshUser,
+        phoneSshPass:  creds.phoneSshPass,
+        phoneHttpUser: creds.phoneHttpUser,
+        phoneHttpPass: creds.phoneHttpPass
+      })
+    });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    await loadCucmConnections();
+    document.getElementById("axlConnSelect").value = name;
+    document.getElementById("axlConnName").value = "";  // vider pour éviter un écrasement accidentel
+    document.getElementById("axlStatus").textContent = "✅ Connection \"" + escHtml(name) + "\" saved.";
+    document.getElementById("axlStatus").style.color = "var(--success)";
+  } catch (e) {
+    document.getElementById("axlStatus").textContent = "Error: " + e.message;
+    document.getElementById("axlStatus").style.color = "var(--error)";
+  }
+});
+
+document.getElementById("btnConnDelete").addEventListener("click", async function() {
+  var name = document.getElementById("axlConnSelect").value;
+  if (!name) return;
+  if (!confirm("Delete connection \"" + name + "\"?")) return;
+  try {
+    var res = await fetch("/api/cucm-connections", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name })
+    });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    await loadCucmConnections();
+    document.getElementById("axlConnSelect").value = "";
+    document.getElementById("axlConnName").value = "";
+    document.getElementById("axlStatus").textContent = "🗑 Connection \"" + escHtml(name) + "\" deleted.";
+    document.getElementById("axlStatus").style.color = "var(--muted)";
+  } catch (e) {
+    document.getElementById("axlStatus").textContent = "Error: " + e.message;
+    document.getElementById("axlStatus").style.color = "var(--error)";
+  }
+});
+
+// Load saved connections on startup
+loadCucmConnections();
+
 async function axlDetectVersion(creds) {
   var res = await fetch("/api/axl/version", {
     method: "POST",

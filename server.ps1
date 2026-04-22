@@ -1,4 +1,4 @@
-param(
+﻿param(
     [int]$Port = 8080,
     [string]$PhonesFile = "phones.json"
 )
@@ -44,6 +44,48 @@ function Read-Phones {
 
     # @() forces an array even if phones.json contains only one element (PS5 deserializes as PSObject otherwise)
     return @(Get-Content -Path $Path -Raw | ConvertFrom-Json)
+}
+
+# ── Chiffrement DPAPI (lié au compte Windows courant) ───────────────────────
+# Prefix ENC: pour distinguer les valeurs chiffrées du texte clair (rétrocompatibilité)
+function Protect-Password {
+    param([string]$PlainText)
+    if ([string]::IsNullOrEmpty($PlainText)) { return "" }
+    try {
+        $enc = ConvertTo-SecureString $PlainText -AsPlainText -Force | ConvertFrom-SecureString
+        return "ENC:$enc"
+    } catch {
+        Write-Log "WARN: Protect-Password échoué — stockage en clair"
+        return $PlainText
+    }
+}
+
+function Unprotect-Password {
+    param([string]$Value)
+    if ([string]::IsNullOrEmpty($Value)) { return "" }
+    if (-not $Value.StartsWith("ENC:")) { return $Value }  # texte clair (ancien format)
+    try {
+        $sec = ConvertTo-SecureString $Value.Substring(4)
+        $ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+        return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($ptr)
+    } catch {
+        Write-Log "WARN: Unprotect-Password échoué — valeur vide retournée"
+        return ""
+    }
+}
+# ────────────────────────────────────────────────────────────────────────────
+
+function Read-CucmConnections {
+    param([string]$Path)
+    if (-not (Test-Path -Path $Path)) { return @() }
+    $parsed = Get-Content -Path $Path -Raw | ConvertFrom-Json
+    if ($null -eq $parsed) { return @() }
+    # Filtrer : ne garder que les entrées valides ayant un champ 'name' non vide
+    # (évite la propagation de corruption PS5 issue de sérialisations précédentes)
+    return @(@($parsed) | Where-Object {
+        $null -ne $_.PSObject.Properties['name'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$_.name)
+    })
 }
 
 function ConvertTo-ExecuteXml {
@@ -545,9 +587,18 @@ try {
             if ($method -eq "GET" -and $path -eq "/api/phones") {
                 $phonesPath = Join-Path $PSScriptRoot $PhonesFile
                 $phones = Read-Phones -Path $phonesPath
-                # Serialize manually as JSON array (ConvertTo-Json PS5 doesn't handle arrays well)
-                $items = @($phones) | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 4 -Compress }
-                $json = "[" + ($items -join ",") + "]"
+                # Déchiffrer les mots de passe avant envoi au client
+                # foreach (mot-clé, même scope) évite les problèmes de résolution de fonctions dans ForEach-Object (PS5)
+                $itemsList = [System.Collections.Generic.List[string]]::new()
+                foreach ($p in $phones) {
+                    $d = [ordered]@{}
+                    foreach ($prop in $p.PSObject.Properties) { $d[$prop.Name] = $prop.Value }
+                    $d['password']    = Unprotect-Password ([string]$p.password)
+                    $d['sshPass']     = Unprotect-Password ([string]$p.sshPass)
+                    $d['consolePass'] = Unprotect-Password ([string]$p.consolePass)
+                    $itemsList.Add((ConvertTo-Json -InputObject $d -Depth 4 -Compress))
+                }
+                $json = "[" + ($itemsList -join ",") + "]"
                 $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
                 $response.StatusCode = 200
                 $response.ContentType = "application/json; charset=utf-8"
@@ -566,11 +617,16 @@ try {
                 if ([string]::IsNullOrWhiteSpace($body.ip))  { throw "Field 'ip' is required." }
 
                 $phonesPath = Join-Path $PSScriptRoot $PhonesFile
-                $phones = [System.Collections.ArrayList]@(Read-Phones -Path $phonesPath)
+                # Construction safe (évite le bug PS5 [ArrayList]@(PSCustomObject[]))
+                $phones = New-Object System.Collections.ArrayList
+                foreach ($ph in (Read-Phones -Path $phonesPath)) { $null = $phones.Add($ph) }
 
                 # Remove existing entry for this SEP if it exists (update)
-                $existing = $phones | Where-Object { $_.sep -eq [string]$body.sep }
-                if ($existing) { $null = $phones.Remove($existing) }
+                $existingIdx = -1
+                for ($i = 0; $i -lt $phones.Count; $i++) {
+                    if ([string]$phones[$i].sep -ceq [string]$body.sep) { $existingIdx = $i; break }
+                }
+                if ($existingIdx -ge 0) { $phones.RemoveAt($existingIdx) }
 
                 $newPhone = [ordered]@{
                     name        = Get-BodyProp $body "name" ([string]$body.sep)
@@ -578,18 +634,19 @@ try {
                     ip          = [string]$body.ip
                     description = Get-BodyProp $body "description"
                     username    = Get-BodyProp $body "username" "admin"
-                    password    = Get-BodyProp $body "password"
+                    password    = Protect-Password (Get-BodyProp $body "password")
                     sshUser     = Get-BodyProp $body "sshUser"
-                    sshPass     = Get-BodyProp $body "sshPass"
+                    sshPass     = Protect-Password (Get-BodyProp $body "sshPass")
                     sshHostKey  = Get-BodyProp $body "sshHostKey"
                     consoleUser = Get-BodyProp $body "consoleUser"
-                    consolePass = Get-BodyProp $body "consolePass"
+                    consolePass = Protect-Password (Get-BodyProp $body "consolePass")
                 }
                 $null = $phones.Add($newPhone)
 
-                # Write JSON file (formatted array)
-                $items = @($phones) | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 4 -Compress }
-                $jsonOut = "[`n  " + ($items -join ",`n  ") + "`n]"
+                # Sérialisation safe avec foreach (évite les problèmes de scope PS5)
+                $itemsList3 = [System.Collections.Generic.List[string]]::new()
+                foreach ($ph in $phones) { $itemsList3.Add((ConvertTo-Json -InputObject $ph -Depth 4 -Compress)) }
+                $jsonOut = "[`n  " + ($itemsList3 -join ",`n  ") + "`n]"
                 [System.IO.File]::WriteAllText($phonesPath, $jsonOut, [System.Text.Encoding]::UTF8)
 
                 Write-Log "phones/add SEP=$([string]$body.sep) IP=$([string]$body.ip)"
@@ -1114,6 +1171,95 @@ try {
                     output   = $outputStr.Trim()
                     exitCode = $sshProc.ExitCode
                 }
+                continue
+            }
+
+            # ── CUCM Connections CRUD ────────────────────────────────
+            $connPath = Join-Path $PSScriptRoot "cucm-connections.json"
+
+            if ($method -eq "GET" -and $path -eq "/api/cucm-connections") {
+                $conns = Read-CucmConnections -Path $connPath
+                # Déchiffrer les mots de passe avant envoi au client
+                $itemsList2 = [System.Collections.Generic.List[string]]::new()
+                foreach ($c in $conns) {
+                    $d = [ordered]@{}
+                    foreach ($prop in $c.PSObject.Properties) { $d[$prop.Name] = $prop.Value }
+                    $d['password']      = Unprotect-Password ([string]$c.password)
+                    $d['phoneSshPass']  = Unprotect-Password ([string]$c.phoneSshPass)
+                    $d['phoneHttpPass'] = Unprotect-Password ([string]$c.phoneHttpPass)
+                    $itemsList2.Add((ConvertTo-Json -InputObject $d -Depth 4 -Compress))
+                }
+                $json = "[" + ($itemsList2 -join ",") + "]"
+                $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.ContentLength64 = $bytes.LongLength
+                $response.OutputStream.Write($bytes, 0, $bytes.Length)
+                $response.OutputStream.Close()
+                continue
+            }
+
+            if ($method -eq "POST" -and $path -eq "/api/cucm-connections") {
+                $reader = [System.IO.StreamReader]::new($request.InputStream, $request.ContentEncoding)
+                $raw = $reader.ReadToEnd(); $reader.Close()
+                $body = $raw | ConvertFrom-Json
+
+                $connName = Get-BodyProp $body "name"
+                if ([string]::IsNullOrWhiteSpace($connName)) { throw "Field 'name' is required." }
+
+                $conns = [System.Collections.ArrayList]@(Read-CucmConnections -Path $connPath)
+                # Use index-based removal (safer than ArrayList.Remove() reference equality in PS5)
+                $existingIdx = -1
+                for ($i = 0; $i -lt $conns.Count; $i++) {
+                    if ([string]$conns[$i].name -ceq $connName) { $existingIdx = $i; break }
+                }
+                if ($existingIdx -ge 0) { $conns.RemoveAt($existingIdx) }
+
+                $entry = [ordered]@{
+                    name          = $connName
+                    cucm          = Get-BodyProp $body "cucm"
+                    username      = Get-BodyProp $body "username"
+                    password      = Protect-Password (Get-BodyProp $body "password")
+                    userId        = Get-BodyProp $body "userId"
+                    userType      = Get-BodyProp $body "userType" "app"
+                    axlVersion    = Get-BodyProp $body "axlVersion" "auto"
+                    phoneSshUser  = Get-BodyProp $body "phoneSshUser"
+                    phoneSshPass  = Protect-Password (Get-BodyProp $body "phoneSshPass")
+                    phoneHttpUser = Get-BodyProp $body "phoneHttpUser"
+                    phoneHttpPass = Protect-Password (Get-BodyProp $body "phoneHttpPass")
+                }
+                $null = $conns.Add($entry)
+
+                $items = @($conns) | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 4 -Compress }
+                $jsonOut = "[`n  " + ($items -join ",`n  ") + "`n]"
+                [System.IO.File]::WriteAllText($connPath, $jsonOut, [System.Text.Encoding]::UTF8)
+
+                Write-Log "cucm-connections: saved '$connName'"
+                Write-JsonResponse -Response $response -StatusCode 200 -Payload @{ ok = $true; name = $connName }
+                continue
+            }
+
+            if ($method -eq "DELETE" -and $path -eq "/api/cucm-connections") {
+                $reader = [System.IO.StreamReader]::new($request.InputStream, $request.ContentEncoding)
+                $raw = $reader.ReadToEnd(); $reader.Close()
+                $body = $raw | ConvertFrom-Json
+
+                $connName = Get-BodyProp $body "name"
+                if ([string]::IsNullOrWhiteSpace($connName)) { throw "Field 'name' is required." }
+
+                $conns = [System.Collections.ArrayList]@(Read-CucmConnections -Path $connPath)
+                $existingIdx = -1
+                for ($i = 0; $i -lt $conns.Count; $i++) {
+                    if ([string]$conns[$i].name -ceq $connName) { $existingIdx = $i; break }
+                }
+                if ($existingIdx -ge 0) {
+                    $conns.RemoveAt($existingIdx)
+                    $items = @($conns) | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 4 -Compress }
+                    $jsonOut = if ($conns.Count -eq 0) { "[]" } else { "[`n  " + ($items -join ",`n  ") + "`n]" }
+                    [System.IO.File]::WriteAllText($connPath, $jsonOut, [System.Text.Encoding]::UTF8)
+                    Write-Log "cucm-connections: deleted '$connName'"
+                }
+                Write-JsonResponse -Response $response -StatusCode 200 -Payload @{ ok = $true; name = $connName }
                 continue
             }
 

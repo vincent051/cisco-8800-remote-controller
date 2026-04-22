@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cisco 8800 Remote Controller</title>
-    <link rel="stylesheet" href="/styles.css?v=7" />
+    <link rel="stylesheet" href="/styles.css?v=8" />
   </head>
   <body>
 
@@ -109,9 +109,9 @@
                   <span></span>
                   <button type="button" data-key="NavUp"     class="kbtn knav">▲</button>
                   <span></span>
-                  <button type="button" data-key="NavLft"    class="kbtn knav">◀</button>
-                  <button type="button" data-key="Select"    class="kbtn knav ksel">OK</button>
-                  <button type="button" data-key="NavRgt"    class="kbtn knav">▶</button>
+                  <button type="button" data-key="NavLeft"   class="kbtn knav">◀</button>
+                  <button type="button" data-key="NavSelect"    class="kbtn knav ksel">OK</button>
+                  <button type="button" data-key="NavRight"  class="kbtn knav">▶</button>
                   <span></span>
                   <button type="button" data-key="NavDwn"    class="kbtn knav">▼</button>
                   <span></span>
@@ -229,6 +229,17 @@
           <aside class="sidebar" id="axlSidebar">
             <article class="card">
               <h2>CUCM Connection</h2>
+
+              <!-- Saved connections -->
+              <div class="field">
+                <label for="axlConnSelect">Saved connections</label>
+                <div class="conn-row">
+                  <select id="axlConnSelect"><option value="">— select —</option></select>
+                  <button type="button" id="btnConnDelete" class="btn-icon btn-danger" title="Delete">🗑</button>
+                </div>
+              </div>
+              <hr class="conn-divider" />
+
               <div class="field">
                 <label for="axlCucm">CUCM IP / FQDN</label>
                 <input id="axlCucm" type="text" placeholder="172.27.199.111" />
@@ -283,6 +294,13 @@
                 </select>
               </div>
               <button type="button" id="btnAxlList" class="btn-blue" style="width:100%;margin-top:8px">🔍 List Phones</button>
+              <div class="field" style="margin-top:10px">
+                <label for="axlConnName">Save as</label>
+                <div class="conn-row">
+                  <input id="axlConnName" type="text" placeholder="Connection name…" />
+                  <button type="button" id="btnConnSave" class="btn-icon btn-green" title="Save">💾</button>
+                </div>
+              </div>
               <p class="status" id="axlStatus"></p>
             </article>
           </aside>
@@ -335,6 +353,6 @@
 
     </main>
 
-    <script src="/app.js?v=23" defer></script>
+    <script src="/app.js?v=25" defer></script>
   </body>
 </html>
