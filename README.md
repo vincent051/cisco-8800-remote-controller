@@ -220,11 +220,10 @@ Each panel contains:
 - **Header bar**: phone name, IP, status indicator (●), capture/auto-refresh/close buttons
   - Drag the header to move the panel anywhere in the workspace
   - Drag the **↘ corner handle** to resize the panel
-- **Screenshot** area with auto-refresh (1 s interval, backs off on error)
+- **Screenshot** area — auto-refresh **enabled by default** (1 s interval, backs off on error)
 - **Softkeys** Soft1–4
-- **Navigation grid**: ▲▼◀▶ + OK
-- **Audio/Call**: Speaker, Headset, Mute, Vol+/−, Hangup, Back
-- **Numeric keypad**: 0–9, `*`, `#`
+- **Controls row**: Navigation grid (▲▼◀▶ + OK) and Numeric keypad (0–9, `*`, `#`) side by side — both scale with the panel width
+- **Audio/Call row**: Speaker, Headset, Mute, Vol+/−, Hangup, Back (horizontal, wraps on resize)
 - **Dial**: free-text number + Call button (or press Enter)
 - **🔒 SSH** section (expandable): preset commands + custom command input
 - **Mini-log**: per-panel event history

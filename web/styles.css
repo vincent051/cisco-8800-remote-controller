@@ -332,56 +332,68 @@ main {
   font-size: 0.72rem;
 }
 
-/* Controls zone: nav + audio + keypad */
+/* Controls zone: nav + keypad (top row), audio (bottom row) */
 .pp-controls {
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 6px;
   flex-shrink: 0;
+  width: 50%;
+}
+.pp-controls-top {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
 }
 .pp-nav-grid {
   display: grid;
-  grid-template-columns: repeat(3, 34px);
-  grid-template-rows: repeat(3, 30px);
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
   gap: 3px;
+  flex: 0 0 auto;
+  width: 102px;
 }
 .pp-nav-grid .kbtn {
-  width: 34px !important;
-  height: 30px;
+  width: 100% !important;
   padding: 0;
   font-size: 0.82rem;
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: unset;
+  aspect-ratio: 1;
 }
 .pp-audio-call {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
 }
 .pp-audio-call .kbtn {
-  width: auto !important;
-  padding: 4px 7px;
+  flex: 1 1 auto;
+  min-width: 44px;
+  padding: 5px 4px;
   font-size: 0.72rem;
-  min-width: 52px;
+  text-align: center;
 }
 .pp-keypad {
   display: grid;
-  grid-template-columns: repeat(3, 30px);
+  grid-template-columns: repeat(3, 1fr);
   gap: 3px;
+  flex: 0 0 auto;
+  width: 102px;
 }
 .pp-keypad .kbtn {
-  width: 30px !important;
-  height: 28px;
+  width: 100% !important;
   padding: 0;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: unset;
+  aspect-ratio: 1;
 }
 
 /* Dial row */
