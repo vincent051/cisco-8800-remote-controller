@@ -88,8 +88,30 @@
 - Toujours appeler `escHtml()` avant d'insérer du contenu dynamique dans le DOM.
 - Les fonctions AXL suivent le pattern : `axlGetCreds()` → `axlDetectVersion()` → action.
 - Quand `axlVersion === "auto"`, appeler `axlDetectVersion()` d'abord et mettre à jour le `<select>`.
-- `autoAddPhoneFromAxl(sepName)` : appelle `/api/axl/phoneip` → si `needsIp: true`, `window.prompt()` pour l'IP → `/api/phones/add` → `loadPhones()`.
-- Le tableau AXL (`axlRenderTable`) a des boutons "🎮 Contrôle" qui appellent `switchToControllerWithPhone(sep)`.
+
+### Architecture multi-panneaux (onglet Controller)
+
+- Le contrôleur est un **workspace multi-panneaux** : plusieurs téléphones simultanément, chaque panneau indépendant.
+- État global : `panels = {}` (id → state), `panelCount = 0`. Pas de variable globale `autoRefreshActive` ni `currentPhoneSep`.
+- Chaque panneau a son propre state : `{ id, phone, autoRefresh, failCount, keyQueue, keyTimer, refreshTimer, dom }`.
+- `createPhonePanel(phone)` : crée un panneau `position:absolute` dans `#panelWorkspace`, câble tous les events, retourne l'id.
+- `setupPanelDrag(panel)` / `setupPanelResize(panel)` : drag via mousedown sur `.pp-header`, resize via `.pp-resize-handle` (coin bas-droit). Les handlers `mousemove`/`mouseup` sont sur `document`.
+- `focusPanel(id)` : ajoute `.pp-focused` (z-index élevé, bordure bleue) au panneau cliqué.
+- `setPanelAutoRefresh(id, bool)` : gère le timer de refresh par panneau. `scheduleRefresh(id)` planifie le prochain screenshot.
+- `enqueuePanelKey(id, key)` / `flushPanelKeys(id)` : debounce 2s, envoi séquentiel avec 150ms inter-touche.
+- `sendPanelCommand(id, payload, title)` : envoie `/api/execute` pour un panneau.
+- `runPanelSsh(id, command)` : SSH via `/api/phone/ssh` pour un panneau.
+- `tilePanels()` : dispose les panneaux en grille dans le workspace.
+- `switchToControllerWithPhone(sepName)` : switche sur l'onglet Controller et appelle `createPhonePanel()`. Si téléphone inconnu, appelle `autoAddPhoneFromAxl(sepName)` puis crée le panneau.
+- **IDs DOM supprimés** (ne jamais référencer dans le code JS) : `activePhoneBar`, `activePhoneName`, `activePhoneIp`, `btnScreenshot`, `btnAutoRefresh`, `btnRefreshNow`, `screenshot`, `screenshotError`, `ctrlScreenCol`, `ctrlControlsCol`, `splitterCtrl`, `keyInput`, `dialInput`, `customXml`, `btnKey`, `btnDial`, `btnXml`, `btnSsh`, `sshCommand`, `sshOutput`.
+- **Variables globales supprimées** : `autoRefreshActive`, `screenshotFailCount`, `provisioningPending`, `keyQueue`, `keyFlushTimer`, `currentPhoneSep` (remplacés par l'état par panneau).
+- `loadPhones()` remplit le `<select id="phoneList">` dans le dock (ne déclenche plus de panneau auto sur téléphone unique).
+- `addLog(msg)` : écrit dans `#log` (dans `#sharedLogBar`, collapsible). `addPanelLog(id, msg)` : écrit dans `.pp-mini-log` du panneau ET dans le log global.
+- Le tableau AXL (`axlRenderTable`) a des boutons "🎮 Control" qui appellent `axlProvisionAndControl(sep)` → provision + `createPhonePanel()` + `setPanelAutoRefresh()`.
+- **Erreur fréquente** : tout `getElementById()` ou `addEventListener()` au niveau top-level sur un élément inexistant crashe le script entier et empêche `loadPhones()` de s'exécuter → dropdown vide. Toujours vérifier que l'élément est bien dans le HTML avant d'y attacher un listener.
+
+### CSS styles.css
+- Vérifier l'équilibre des accolades après toute modification : `$open` doit égaler `$close`. Une accolade orpheline après `}` d'un bloc ou des propriétés hors sélecteur cassent l'affichage silencieusement.
 
 ## Sécurité
 - Ne jamais logger les mots de passe en clair dans les logs serveur.

@@ -48,7 +48,7 @@ body {
   gap: 20px;
 }
 .cisco-logo {
-  width: 114px;
+  width: 90px;
   height: 34px;
   flex-shrink: 0;
 }
@@ -80,10 +80,6 @@ main {
   gap: 0;
   align-items: start;
 }
-  grid-template-columns: 300px 1fr;
-  gap: 18px;
-  align-items: start;
-}
 
 @media (max-width: 860px) {
   .page-grid { flex-direction: column; }
@@ -93,8 +89,10 @@ main {
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 14px;  width: 300px;
-  flex-shrink: 0;}
+  gap: 14px;
+  width: 300px;
+  flex-shrink: 0;
+}
 
 /* ══ Controller tab - multi-panel workspace ══ */
 #tab-controller.active {
