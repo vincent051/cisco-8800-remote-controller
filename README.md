@@ -12,9 +12,8 @@ Local web application to control **Cisco IP Phone 8800 series** phones and manag
 
 | Tab | Description |
 |-----|-------------|
-| **Controller** | Full physical keypad (softkeys, navigation, numeric keypad, lines), resizable split screen |
+| **Controller** | Multi-panel workspace — open one panel per phone simultaneously. Each panel: screenshot, auto-refresh, full keypad, SSH diagnostics. Panels are draggable and resizable. |
 | **AXL / CUCM** | Lists all CUCM phones with real-time IP and registration status, one-click provisioning |
-| **SSH Diagnostics** | Interactive SSH console to the phone via plink |
 
 ---
 
@@ -204,14 +203,33 @@ These values correspond to the `username` and `password` fields in `phones.json`
 
 ### Controller Tab
 
-1. Select a phone from the dropdown list
-2. Use the keys:
-   - **Softkeys** (Soft1–4): contextual keys on the phone screen
-   - **Navigation**: directional arrows, Select, Back, Home
-   - **Numeric keypad**: 0–9, `*`, `#`
-   - **Lines**: L1–L4 (line selection)
-   - **Volume**, **Speaker**, **Mute**, **Hangup**
-3. The vertical splitter is draggable to adjust column widths
+The controller is a **multi-panel workspace** — you can control multiple phones simultaneously.
+
+#### Dock bar (top)
+
+| Control | Description |
+|---------|-------------|
+| Phone selector | Choose a phone from `phones.json` |
+| **＋ Add Panel** | Opens a floating panel for the selected phone |
+| **⊞ Tile** | Automatically arranges all open panels in a grid |
+| **📋 Log** | Shows/hides the shared event log |
+
+#### Phone panel
+
+Each panel contains:
+- **Header bar**: phone name, IP, status indicator (●), capture/auto-refresh/close buttons
+  - Drag the header to move the panel anywhere in the workspace
+  - Drag the **↘ corner handle** to resize the panel
+- **Screenshot** area with auto-refresh (1 s interval, backs off on error)
+- **Softkeys** Soft1–4
+- **Navigation grid**: ▲▼◀▶ + OK
+- **Audio/Call**: Speaker, Headset, Mute, Vol+/−, Hangup, Back
+- **Numeric keypad**: 0–9, `*`, `#`
+- **Dial**: free-text number + Call button (or press Enter)
+- **🔒 SSH** section (expandable): preset commands + custom command input
+- **Mini-log**: per-panel event history
+
+> Keys use a 2-second debounce queue — click multiple keys quickly, they are sent in sequence with a 150 ms inter-key delay.
 
 ### AXL / CUCM Tab
 
@@ -373,9 +391,10 @@ cisco-8800-remote-controller/
 ├── restart-server.ps1      # Clean server restart
 ├── phones.example.json     # Phone configuration template
 ├── phones.json             # Actual configuration (gitignored — do not commit)
+├── cucm-connections.json   # Saved CUCM connections (gitignored)
 ├── web/
-│   ├── index.html          # Main interface
-│   ├── app.js              # Frontend logic
+│   ├── index.html          # Main interface (multi-panel workspace + AXL tab)
+│   ├── app.js              # Frontend logic (panels, key queue, SSH, AXL)
 │   └── styles.css          # Styles
 └── .github/
     └── copilot-instructions.md

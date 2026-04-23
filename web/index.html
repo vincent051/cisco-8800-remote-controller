@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cisco 8800 Remote Controller</title>
-    <link rel="stylesheet" href="/styles.css?v=8" />
+    <link rel="stylesheet" href="/styles.css?v=10" />
   </head>
   <body>
 
     <header class="topbar">
       <div class="topbar-inner">
         <div class="topbar-brand">
-          <svg class="cisco-logo" viewBox="0 0 90 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg class="cisco-logo" viewBox="0 0 114 34" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="0"  y="12" width="6" height="10" rx="2" fill="#049fd9"/>
             <rect x="9"  y="6"  width="6" height="22" rx="2" fill="#049fd9"/>
             <rect x="18" y="2"  width="6" height="30" rx="2" fill="#049fd9"/>
@@ -35,190 +35,37 @@
         <button class="tab-btn active" data-tab="tab-axl">🏢 CUCM AXL</button>
       </div>
 
-      <!-- ══ Onglet 1 : Contrôleur ══ -->
+      <!-- ══ Onglet 1 : Contrôleur multi-panneaux ══ -->
       <div id="tab-controller" class="tab-pane">
 
-        <!-- Hidden IP/credentials fields -->
+        <!-- Dock bar -->
+        <div class="panel-dock">
+          <select id="phoneList" class="dock-phone-sel"></select>
+          <button type="button" id="btnAddPanel" class="btn-blue dock-btn">＋ Add Panel</button>
+          <button type="button" id="btnTileAll"  class="btn-ghost dock-btn">⊞ Tile</button>
+          <span class="dock-hint">Drag the title bar to move · Corner ↘ to resize</span>
+          <button type="button" id="btnToggleLog" class="btn-ghost dock-btn">📋 Log</button>
+        </div>
+
+        <!-- Workspace — panels live here -->
+        <div class="panel-workspace" id="panelWorkspace">
+          <div class="workspace-empty" id="workspaceEmpty">
+            <div class="workspace-empty-icon">📵</div>
+            <p>Select a phone and click <strong>＋ Add Panel</strong></p>
+          </div>
+        </div>
+
+        <!-- Shared log (collapsible) -->
+        <div class="shared-log-bar" id="sharedLogBar" style="display:none">
+          <pre class="log" id="log"></pre>
+        </div>
+
+        <!-- Hidden fields kept for backward compat -->
         <input type="hidden" id="targetIp" />
         <input type="hidden" id="username" />
         <input type="hidden" id="password" />
-        <select id="phoneList" style="display:none"></select>
+        <p class="status" id="status" style="display:none"></p>
 
-        <!-- ── Active phone banner ── -->
-        <div class="ctrl-banner">
-          <div class="active-phone-bar" id="activePhoneBar">
-            <span class="active-phone-icon">📵</span>
-            <div class="active-phone-info">
-              <span id="activePhoneName" class="active-phone-name">No active phone</span>
-              <span id="activePhoneIp" class="active-phone-ip"></span>
-            </div>
-          </div>
-          <p class="status" id="status"></p>
-          <div class="ctrl-banner-actions">
-            <button type="button" id="btnScreenshot">📷 Capture</button>
-            <button type="button" id="btnAutoRefresh" class="btn-outline">Auto-refresh: OFF</button>
-            <button type="button" id="btnRefreshNow" class="btn-ghost">↺ Refresh</button>
-          </div>
-        </div>
-
-          <!-- ── 2-column body ── -->
-        <div class="ctrl-body">
-
-          <!-- Col 1: Screen + Softkeys -->
-          <section class="ctrl-screen-col" id="ctrlScreenCol">
-            <div class="screenshot-box">
-              <img id="screenshot" alt="Phone screen" />
-              <p id="screenshotError" class="screenshot-msg">Click "Capture" to display.</p>
-            </div>
-            <div class="softkey-bar">
-              <button type="button" data-key="Soft1" class="kbtn ksoft">SK 1</button>
-              <button type="button" data-key="Soft2" class="kbtn ksoft">SK 2</button>
-              <button type="button" data-key="Soft3" class="kbtn ksoft">SK 3</button>
-              <button type="button" data-key="Soft4" class="kbtn ksoft">SK 4</button>
-            </div>
-          </section>
-
-          <!-- Resizable splitter -->
-          <div class="h-splitter" id="splitterCtrl"></div>
-
-          <!-- Col 2: Commands + Keys + SSH + Log -->
-          <section class="ctrl-controls-col" id="ctrlControlsCol">
-
-            <!-- Quick commands -->
-            <div class="commands-inline">
-              <div class="cmd-row">
-                <input id="keyInput" type="text" placeholder="Key (e.g.: Speaker)" value="Speaker" />
-                <button type="button" id="btnKey">Send</button>
-              </div>
-              <div class="cmd-row">
-                <input id="dialInput" type="text" placeholder="Dial a number..." />
-                <button type="button" id="btnDial" class="btn-green">Dial</button>
-              </div>
-              <div class="cmd-row">
-                <textarea id="customXml" placeholder="<CiscoIPPhoneExecute>...</CiscoIPPhoneExecute>"></textarea>
-                <button type="button" id="btnXml" class="btn-ghost">XML</button>
-              </div>
-            </div>
-
-            <!-- Navigation · Audio · Call · Apps -->
-            <div class="ctrl-row">
-
-              <div class="kpad-group">
-                <div class="kpad-title">Navigation</div>
-                <div class="kpad-nav">
-                  <span></span>
-                  <button type="button" data-key="NavUp"     class="kbtn knav">▲</button>
-                  <span></span>
-                  <button type="button" data-key="NavLeft"   class="kbtn knav">◀</button>
-                  <button type="button" data-key="NavSelect"    class="kbtn knav ksel">OK</button>
-                  <button type="button" data-key="NavRight"  class="kbtn knav">▶</button>
-                  <span></span>
-                  <button type="button" data-key="NavDwn"    class="kbtn knav">▼</button>
-                  <span></span>
-                </div>
-              </div>
-
-              <div class="kpad-group">
-                <div class="kpad-title">Audio</div>
-                <div class="kpad-row wrap">
-                  <button type="button" data-key="Speaker" class="kbtn kaudio">🔊 Speaker</button>
-                  <button type="button" data-key="Headset" class="kbtn kaudio">🎧 Headset</button>
-                  <button type="button" data-key="Mute"    class="kbtn kaudio">🔇 Mute</button>
-                  <button type="button" data-key="VolUp"   class="kbtn kaudio">Vol +</button>
-                  <button type="button" data-key="VolDwn"  class="kbtn kaudio">Vol −</button>
-                </div>
-              </div>
-
-              <div class="kpad-group">
-                <div class="kpad-title">Call</div>
-                <div class="kpad-row wrap">
-                  <button type="button" data-key="Hangup"  class="kbtn kdanger">📵 End Call</button>
-                </div>
-                <p class="kpad-hint">Hold · Transfer · Confrn<br>= SK 1–4</p>
-              </div>
-
-              <div class="kpad-group">
-                <div class="kpad-title">Applications</div>
-                <div class="kpad-row wrap">
-                  <button type="button" data-key="Messages"     class="kbtn kapp">Messages</button>
-                  <button type="button" data-key="Directories"  class="kbtn kapp">Dir.</button>
-                  <button type="button" data-key="Applications" class="kbtn kapp">Apps</button>
-                  <button type="button" data-key="Services"     class="kbtn kapp">Services</button>
-                  <button type="button" data-key="Back"         class="kbtn kapp">⌫ Back</button>
-                </div>
-              </div>
-
-            </div>
-
-            <!-- Keypad · Lines -->
-            <div class="ctrl-row" style="margin-top:14px">
-
-              <div class="kpad-group">
-                <div class="kpad-title">Keypad</div>
-                <div class="kpad-numpad">
-                  <button type="button" data-key="1"     class="kbtn knum">1</button>
-                  <button type="button" data-key="2"     class="kbtn knum">2</button>
-                  <button type="button" data-key="3"     class="kbtn knum">3</button>
-                  <button type="button" data-key="4"     class="kbtn knum">4</button>
-                  <button type="button" data-key="5"     class="kbtn knum">5</button>
-                  <button type="button" data-key="6"     class="kbtn knum">6</button>
-                  <button type="button" data-key="7"     class="kbtn knum">7</button>
-                  <button type="button" data-key="8"     class="kbtn knum">8</button>
-                  <button type="button" data-key="9"     class="kbtn knum">9</button>
-                  <button type="button" data-key="*"     class="kbtn knum">*</button>
-                  <button type="button" data-key="0"     class="kbtn knum">0</button>
-                  <button type="button" data-key="#"     class="kbtn knum">#</button>
-                </div>
-              </div>
-
-              <div class="kpad-group">
-                <div class="kpad-title">Lines</div>
-                <div class="kpad-row wrap">
-                  <button type="button" data-key="Line1" class="kbtn kline">Line 1</button>
-                  <button type="button" data-key="Line2" class="kbtn kline">Line 2</button>
-                  <button type="button" data-key="Line3" class="kbtn kline">Line 3</button>
-                  <button type="button" data-key="Line4" class="kbtn kline">Line 4</button>
-                </div>
-              </div>
-
-            </div>
-
-            <!-- SSH Diagnostics -->
-            <div class="ssh-section">
-              <div class="kpad-title">SSH Diagnostics</div>
-              <div class="ssh-presets">
-                <button type="button" class="btn-ssh-preset" data-cmd="show version">Version</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="show config network">Network</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="show status">Status</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="show dhcp">DHCP</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="show security">Security</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="show hosts">Hosts</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="show config security">ITL</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="show call-history summary">Call History</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="erase all settings">Erase All Settings</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="erase network configuration">Erase Network Configuration</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="erase ctl">Erase CTL</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="reset hard">Reset Hard</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="reset factory">Reset Factory</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="reset soft">Reset Soft</button>
-                <button type="button" class="btn-ssh-preset" data-cmd="uptime">Uptime</button>
-              </div>
-              <div class="ssh-custom-row">
-                <input id="sshCommand" type="text" placeholder="Custom SSH command..." />
-                <button type="button" id="btnSsh">Run</button>
-              </div>
-              <pre id="sshOutput" class="ssh-output"></pre>
-            </div>
-
-            <!-- Log -->
-            <div class="ctrl-log-section">
-              <div class="kpad-title">Log</div>
-              <pre class="log" id="log"></pre>
-            </div>
-
-          </section>
-
-        </div>
       </div><!-- end tab-controller -->
 
       <!-- ══ Tab 2: CUCM AXL ══ -->
@@ -353,6 +200,6 @@
 
     </main>
 
-    <script src="/app.js?v=25" defer></script>
+    <script src="/app.js?v=28" defer></script>
   </body>
 </html>

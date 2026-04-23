@@ -48,7 +48,7 @@ body {
   gap: 20px;
 }
 .cisco-logo {
-  width: 90px;
+  width: 114px;
   height: 34px;
   flex-shrink: 0;
 }
@@ -96,13 +96,365 @@ main {
   gap: 14px;  width: 300px;
   flex-shrink: 0;}
 
-/* ══ Controller tab - full screen layout, zero margin ══ */
+/* ══ Controller tab - multi-panel workspace ══ */
 #tab-controller.active {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 105px); /* topbar(60) + tabbar(44) + 1px border */
   min-height: 500px;
   padding: 0;
+  overflow: hidden;
+}
+
+/* ── Dock bar ─────────────────────────────────── */
+.panel-dock {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  z-index: 100;
+}
+.dock-phone-sel {
+  width: auto;
+  min-width: 180px;
+  max-width: 260px;
+  font-size: 0.84rem;
+  padding: 6px 10px;
+}
+.dock-btn {
+  width: auto !important;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.dock-hint {
+  flex: 1;
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Workspace ────────────────────────────────── */
+.panel-workspace {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  background:
+    radial-gradient(circle, rgba(4,159,217,0.04) 1px, transparent 1px),
+    var(--bg);
+  background-size: 28px 28px;
+}
+
+.workspace-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+  user-select: none;
+}
+.workspace-empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 10px;
+  opacity: 0.35;
+}
+.workspace-empty p {
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+/* ── Shared log bar ───────────────────────────── */
+.shared-log-bar {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  padding: 6px 12px;
+  max-height: 140px;
+}
+.shared-log-bar .log {
+  max-height: 110px;
+  margin: 0;
+}
+
+/* ── Phone Panel ──────────────────────────────── */
+.phone-panel {
+  position: absolute;
+  width: 420px;
+  min-width: 310px;
+  min-height: 400px;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 10;
+  transition: box-shadow 150ms, border-color 150ms;
+}
+.phone-panel.pp-focused {
+  border-color: var(--blue);
+  box-shadow: 0 6px 28px rgba(4,159,217,0.22);
+  z-index: 20;
+}
+
+/* Header */
+.pp-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  background: var(--navy);
+  color: #fff;
+  cursor: grab;
+  flex-shrink: 0;
+  user-select: none;
+  border-radius: 8px 8px 0 0;
+}
+.pp-header:active { cursor: grabbing; }
+.pp-drag {
+  font-size: 1rem;
+  opacity: 0.5;
+  letter-spacing: -2px;
+  flex-shrink: 0;
+}
+.pp-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+  font-family: Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+  flex-shrink: 0;
+}
+.pp-ip {
+  font-size: 0.73rem;
+  opacity: 0.65;
+  font-family: Consolas, monospace;
+  white-space: nowrap;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-dot {
+  font-size: 0.65rem;
+  flex-shrink: 0;
+  transition: color 200ms;
+}
+.pp-dot-ok  { color: #6ebe4a; }
+.pp-dot-err { color: #e2231a; }
+.pp-dot-off { color: #5b6b7c; }
+
+.pp-header-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.pp-btn {
+  width: auto !important;
+  padding: 3px 7px !important;
+  font-size: 0.72rem !important;
+  background: rgba(255,255,255,0.13);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  color: #fff;
+  transition: background 100ms;
+}
+.pp-btn:hover { background: rgba(255,255,255,0.28); filter: none; }
+.pp-btn:active { transform: scale(0.94); }
+.pp-btn-ar.pp-ar-on { background: var(--blue); border-color: var(--blue); }
+.pp-btn-close:hover { background: var(--red) !important; border-color: var(--red) !important; }
+
+/* Status bar */
+.pp-status-bar {
+  flex-shrink: 0;
+  font-size: 0.74rem;
+  padding: 3px 10px;
+  min-height: 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-status-ok  { color: #1e7e34 !important; }
+.pp-status-err { color: var(--red) !important; }
+
+/* Body */
+.pp-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px;
+  min-height: 0;
+}
+
+/* Screenshot */
+.pp-screenshot-wrap {
+  background: #0d1117;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.pp-screenshot {
+  width: 100%;
+  display: none;
+  border-radius: 6px;
+}
+.pp-screenshot-msg {
+  color: #58a6ff;
+  font-size: 0.74rem;
+  margin: 12px;
+  text-align: center;
+}
+
+/* Softkeys */
+.pp-softkeys {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pp-softkeys .kbtn {
+  width: 100% !important;
+  padding: 5px 2px;
+  font-size: 0.72rem;
+}
+
+/* Controls zone: nav + audio + keypad */
+.pp-controls {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.pp-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 30px);
+  gap: 3px;
+}
+.pp-nav-grid .kbtn {
+  width: 34px !important;
+  height: 30px;
+  padding: 0;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: unset;
+}
+.pp-audio-call {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pp-audio-call .kbtn {
+  width: auto !important;
+  padding: 4px 7px;
+  font-size: 0.72rem;
+  min-width: 52px;
+}
+.pp-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 30px);
+  gap: 3px;
+}
+.pp-keypad .kbtn {
+  width: 30px !important;
+  height: 28px;
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: unset;
+}
+
+/* Dial row */
+.pp-dial-row {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.pp-dial-row input  { flex: 1; min-width: 0; padding: 5px 8px; font-size: 0.82rem; }
+.pp-dial-row button { width: auto !important; padding: 5px 10px; font-size: 0.8rem; }
+
+/* SSH collapsible section inside panel */
+.pp-ssh-section { border-top: 1px solid var(--border); padding-top: 6px; flex-shrink: 0; }
+.pp-ssh-toggle {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  color: var(--muted) !important;
+  width: auto !important;
+  padding: 3px 10px !important;
+  font-size: 0.72rem !important;
+}
+.pp-ssh-toggle:hover { background: var(--bg) !important; }
+.pp-ssh-body { margin-top: 6px; display: none; }
+.pp-ssh-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-bottom: 5px;
+}
+.pp-ssh-presets .btn-ssh-preset { font-size: 0.65rem; padding: 4px 3px; }
+.pp-ssh-cmd-row { display: flex; gap: 5px; margin-bottom: 4px; }
+.pp-ssh-cmd-row input  { flex: 1; min-width: 0; padding: 4px 7px; font-size: 0.78rem; }
+.pp-ssh-cmd-row button { width: auto !important; padding: 4px 8px; font-size: 0.78rem; }
+.pp-ssh-output {
+  background: #0d1117;
+  color: #58a6ff;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  min-height: 28px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+/* Mini log at bottom of panel */
+.pp-mini-log {
+  border-top: 1px solid var(--border);
+  padding-top: 5px;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--muted);
+  max-height: 70px;
+  overflow-y: auto;
+  font-family: Consolas, monospace;
+  line-height: 1.5;
+}
+
+/* Resize handle */
+.pp-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, rgba(4,159,217,0.4) 50%);
+  border-radius: 0 0 9px 0;
 }
 
 /* Active phone banner */
