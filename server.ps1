@@ -1098,34 +1098,207 @@ try {
                 if ([string]::IsNullOrWhiteSpace($body.consolePass)) { throw "Field 'consolePass' is required." }
                 if ([string]::IsNullOrWhiteSpace($body.command))     { throw "Field 'command' is required." }
 
-                # SSH connection to Cisco 8800: without PTY, the phone presents a serial console
-                # Sequence: SSH(sshUser/sshPass) -> [y si cle inconnue] -> serial console(consoleUser/consolePass) -> command -> exit
-                # Si sshHostKey connu : utiliser -batch -hostkey (connexion immediate, sans prompt)
-                # Si sshHostKey absent  : ne pas utiliser -batch pour pouvoir repondre "y" au prompt cle via stdin
-                $acceptKeyViaStdin = $false
-                if (-not [string]::IsNullOrWhiteSpace($body.sshHostKey)) {
-                    $plinkArgs = "-ssh -batch -hostkey `"$([string]$body.sshHostKey)`" -l $([string]$body.sshUser) -pw $([string]$body.sshPass)"
-                } else {
-                    $plinkArgs = "-ssh -l $([string]$body.sshUser) -pw $([string]$body.sshPass)"
-                    $acceptKeyViaStdin = $true
-                }
-                $plinkArgs += " $([string]$body.ip)"
+                $sshIp = [string]$body.ip
 
-                Write-Log "SSH $($body.ip) : $($body.command) [hostkey=$(if($body.sshHostKey){'connu'}else{'inconnu'})]"
+                # ── Pre-check 1 : test TCP port 22 ───────────────────────────────────
+                # Evite d'attendre 15s+ pour un timeout si le telephone est hors ligne
+                $tcpClient = New-Object System.Net.Sockets.TcpClient
+                $tcpConnected = $false
+                try {
+                    $ar = $tcpClient.BeginConnect($sshIp, 22, $null, $null)
+                    $tcpConnected = $ar.AsyncWaitHandle.WaitOne(3000)
+                    if ($tcpConnected) { try { $tcpClient.EndConnect($ar) } catch { $tcpConnected = $false } }
+                } catch { $tcpConnected = $false }
+                finally { try { $tcpClient.Close() } catch {} }
+
+                if (-not $tcpConnected) {
+                    Write-Log "SSH pre-check: port 22 inaccessible sur $sshIp"
+                    Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
+                        ok                = $false
+                        connectionRefused = $true
+                        error             = "SSH pre-check: port 22 inaccessible sur $sshIp — telephone hors ligne, SSH desactive, ou IP incorrecte apres changement de cluster."
+                    }
+                    continue
+                }
+                Write-Log "SSH pre-check: port 22 OK sur $sshIp"
+
+                # ── Pre-check 2 : banner SSH (detection algorithme / version) ─────────
+                # Permet de savoir si le telephone accepte la connexion SSH avant d'envoyer les creds
+                $sshBanner = ""
+                try {
+                    $bannerTcp = New-Object System.Net.Sockets.TcpClient
+                    $bannerTcp.Connect($sshIp, 22)
+                    $bannerStream = $bannerTcp.GetStream()
+                    $bannerStream.ReadTimeout = 2000
+                    $bannerBuf = New-Object byte[] 256
+                    $bannerRead = $bannerStream.Read($bannerBuf, 0, 256)
+                    if ($bannerRead -gt 0) {
+                        $sshBanner = [System.Text.Encoding]::ASCII.GetString($bannerBuf, 0, $bannerRead).Trim()
+                    }
+                    $bannerTcp.Close()
+                } catch { $sshBanner = "" }
+                if ($sshBanner) { Write-Log "SSH banner $sshIp : $sshBanner" }
+
+                # ── Detection SSH legacy (OpenSSH 5.x / CUCM 11.5) ───────────────────
+                # Plink 0.83 classe aes256-cbc/aes128-cbc apres le marqueur WARN.
+                # En mode -batch, plink refuse silencieusement quand un cipher WARN est
+                # selectionne → timeout sans sortie. OpenSSH 5.x (CUCM 11.5) ne propose
+                # QUE des ciphers CBC → -batch echoue toujours.
+                # Sans -batch + -hostkey + stdin redirige : connexion OK, aucun prompt bloquant.
+                # IMPORTANT : sans -hostkey, plink lit le prompt "Store key in cache?" depuis le
+                # handle console Windows (pas stdin redirige) → blocage indefini. Il FAUT -hostkey.
+                $isLegacySsh = $sshBanner -match "SSH-2\.0-OpenSSH_[0-5]\."
+                if ($isLegacySsh) { Write-Log "SSH $sshIp : SSH legacy (OpenSSH 5.x / CUCM 11.5) detecte" }
+
+                $storedHostKey    = [string]$body.sshHostKey
+                $effectiveHostKey = ""
+                $newSshHostKey    = $null
+
+                # ── Obtention de l'empreinte SSH ─────────────────────────────────────
+                # Legacy (OpenSSH 5.x) : ssh-keyscan echoue (cipher negotiation)
+                #   → sonde ssh.exe -T (pas de PTY) : se connecte, stocke la cle dans un fichier
+                #     temporaire known_hosts, sort code 1. La cle est extraite du fichier.
+                # Moderne : ssh-keyscan standard.
+                if ($isLegacySsh) {
+                    Write-Log "SSH $sshIp : sonde ssh.exe pour obtenir la cle hote legacy..."
+                    $tempKhFile = [System.IO.Path]::GetTempFileName()
+                    $tmpProbeGuid = [System.Guid]::NewGuid().ToString("N")
+                    $tmpBatProbe  = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "askpass_probe_$tmpProbeGuid.bat")
+                    # Le bat ecrit uniquement le mot de passe SSH (pour SSH_ASKPASS)
+                    $sshPassEscaped = ([string]$body.sshPass) -replace '"','""'
+                    Set-Content -Path $tmpBatProbe -Value "@echo off`r`necho $sshPassEscaped" -Encoding ASCII
+                    try {
+                        $sshProbePsi = New-Object System.Diagnostics.ProcessStartInfo
+                        $sshProbePsi.FileName       = "ssh"
+                        $sshProbePsi.UseShellExecute = $false
+                        $sshProbePsi.Arguments       = "-T -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -o Ciphers=+aes128-cbc -o MACs=+hmac-sha1 -o StrictHostKeyChecking=no -o UserKnownHostsFile=`"$tempKhFile`" -o LogLevel=QUIET -l $([string]$body.sshUser) $sshIp"
+                        $sshProbePsi.RedirectStandardInput  = $true
+                        $sshProbePsi.RedirectStandardOutput = $true
+                        $sshProbePsi.RedirectStandardError  = $true
+                        $sshProbePsi.CreateNoWindow          = $true
+                        $sshProbePsi.EnvironmentVariables["SSH_ASKPASS"]         = $tmpBatProbe
+                        $sshProbePsi.EnvironmentVariables["SSH_ASKPASS_REQUIRE"] = "force"
+                        $sshProbeProc = [System.Diagnostics.Process]::Start($sshProbePsi)
+                        $sshProbeProc.StandardInput.Close()
+                        $null = $sshProbeProc.WaitForExit(5000)
+                        # Lire la cle depuis le fichier known_hosts temporaire
+                        $khLines = Get-Content $tempKhFile -ErrorAction SilentlyContinue
+                        foreach ($khLine in $khLines) {
+                            if ($khLine -match '^\S+\s+(ssh-rsa|ssh-dss)\s+(\S+)') {
+                                $keyB64 = $Matches[2]
+                                try {
+                                    $keyBytes  = [Convert]::FromBase64String($keyB64)
+                                    $sha256    = [System.Security.Cryptography.SHA256]::Create()
+                                    $hashBytes = $sha256.ComputeHash($keyBytes)
+                                    $hashB64   = [Convert]::ToBase64String($hashBytes).TrimEnd('=')
+                                    $effectiveHostKey = "SHA256:$hashB64"
+                                    Write-Log "SSH $sshIp : cle SSH legacy obtenue → $effectiveHostKey"
+                                } catch {
+                                    Write-Log "SSH $sshIp : erreur SHA256 cle legacy — $($_.Exception.Message)"
+                                }
+                                break
+                            }
+                        }
+                    } catch {
+                        Write-Log "SSH $sshIp : sonde ssh.exe echec — $($_.Exception.Message)"
+                    } finally {
+                        Remove-Item $tempKhFile  -Force -ErrorAction SilentlyContinue
+                        Remove-Item $tmpBatProbe -Force -ErrorAction SilentlyContinue
+                    }
+                } else {
+                    Write-Log "SSH $sshIp : keyscan (verification empreinte actuelle)..."
+                    try {
+                        $ksJob = Start-Job -ScriptBlock {
+                            param($ip)
+                            & ssh-keyscan -t rsa,dss $ip 2>$null
+                        } -ArgumentList $sshIp
+                        $null = Wait-Job $ksJob -Timeout 5
+                        $keyscanLines = Receive-Job $ksJob
+                        Remove-Job $ksJob -Force
+                        foreach ($kLine in $keyscanLines) {
+                            if ($kLine -match '^\S+\s+(ssh-rsa|ssh-dss)\s+(\S+)') {
+                                $keyAlg = $Matches[1]
+                                $keyB64 = $Matches[2]
+                                try {
+                                    $keyBytes  = [Convert]::FromBase64String($keyB64)
+                                    $sha256    = [System.Security.Cryptography.SHA256]::Create()
+                                    $hashBytes = $sha256.ComputeHash($keyBytes)
+                                    $hashB64   = [Convert]::ToBase64String($hashBytes).TrimEnd('=')
+                                    $effectiveHostKey = "SHA256:$hashB64"
+                                    Write-Log "SSH $sshIp : empreinte keyscan $keyAlg → $effectiveHostKey"
+                                } catch {
+                                    Write-Log "SSH $sshIp : erreur calcul SHA256 — $($_.Exception.Message)"
+                                }
+                                break
+                            }
+                        }
+                    } catch {
+                        Write-Log "SSH $sshIp : ssh-keyscan echec — $($_.Exception.Message)"
+                    }
+                }
+
+                # Comparer la cle obtenue avec la cle stockee
+                if (-not [string]::IsNullOrWhiteSpace($effectiveHostKey)) {
+                    if ($effectiveHostKey -ne $storedHostKey) {
+                        $newSshHostKey = $effectiveHostKey
+                        Write-Log "SSH $sshIp : empreinte$(if($storedHostKey){' CHANGEE (stockee: ' + $storedHostKey + ')'}else{' decouverte'}) → sauvegarde: $effectiveHostKey"
+                    }
+                } else {
+                    # Sonde echouee : utiliser la cle stockee comme fallback
+                    $effectiveHostKey = $storedHostKey
+                    Write-Log "SSH $sshIp : empreinte non obtenue — utilisation cle stockee ($(if($storedHostKey){$storedHostKey}else{'aucune'}))"
+                }
+
+                # ── Construction des arguments plink ─────────────────────────────────
+                # Legacy (OpenSSH 5.x) : plink SANS -batch, AVEC -hostkey (obligatoire :
+                #   sans -hostkey plink bloque sur son prompt console Windows, pas stdin redirige).
+                # Moderne : plink AVEC -batch -hostkey ou fallback stdin "y".
+                $plinkArgsList = @()
+                if (-not [string]::IsNullOrWhiteSpace($effectiveHostKey)) {
+                    if ($isLegacySsh) {
+                        # Legacy : sans -batch (accepte CBC), avec -hostkey (evite le prompt console)
+                        $plinkArgsList += @{
+                            args      = "-ssh -hostkey `"$effectiveHostKey`" -l $([string]$body.sshUser) -pw $([string]$body.sshPass) $sshIp"
+                            acceptKey = $false
+                            label     = "legacy empreinte SHA256 (sans -batch)"
+                        }
+                    } else {
+                        # Moderne : avec -batch -hostkey (mode non-interactif strict)
+                        $plinkArgsList += @{
+                            args      = "-ssh -batch -hostkey `"$effectiveHostKey`" -l $([string]$body.sshUser) -pw $([string]$body.sshPass) $sshIp"
+                            acceptKey = $false
+                            label     = "empreinte SHA256"
+                        }
+                    }
+                }
+                # Fallback stdin "y" uniquement pour SSH moderne (legacy : risque de blocage sur console)
+                if (-not $isLegacySsh) {
+                    $plinkArgsList += @{
+                        args      = "-ssh -l $([string]$body.sshUser) -pw $([string]$body.sshPass) $sshIp"
+                        acceptKey = $true
+                        label     = "stdin y (fallback)"
+                    }
+                }
+                # Si liste vide (legacy sans empreinte) : erreur explicite
+                if ($plinkArgsList.Count -eq 0) {
+                    throw "SSH echec : impossible d'obtenir l'empreinte SSH du telephone legacy (OpenSSH 5.x). Assurez-vous que ssh.exe est dans le PATH et que le telephone est joignable."
+                }
+
+                Write-Log "SSH $sshIp : $($body.command) [empreinte=$(if($effectiveHostKey){$effectiveHostKey}else{'inconnue'})] banner=$(if($sshBanner){$sshBanner}else{'N/A'})"
 
                 $rawOutput = ""; $rawStderr = ""; $sshExitCode = -1
-                $maxAttempts = 3
 
-                for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+                foreach ($plinkVariant in $plinkArgsList) {
                     $psi = New-Object System.Diagnostics.ProcessStartInfo
                     $psi.FileName        = "plink"
-                    $psi.Arguments       = $plinkArgs
+                    $psi.Arguments       = $plinkVariant.args
                     $psi.RedirectStandardInput  = $true
                     $psi.RedirectStandardOutput = $true
                     $psi.RedirectStandardError  = $true
                     $psi.UseShellExecute        = $false
                     $psi.CreateNoWindow         = $true
 
+                    Write-Log "SSH plink variant: $($plinkVariant.label)"
                     $sshProc = [System.Diagnostics.Process]::Start($psi)
                     $outTask = $sshProc.StandardOutput.ReadToEndAsync()
                     $errTask = $sshProc.StandardError.ReadToEndAsync()
@@ -1134,11 +1307,13 @@ try {
                     # un caractere supplementaire dans le mot de passe (authentification echoue avec \r\n)
                     $sshProc.StandardInput.NewLine = "`n"
 
-                    if ($acceptKeyViaStdin) {
+                    if ($plinkVariant.acceptKey) {
+                        # Attendre le prompt "Store key in cache? (y/n, Return cancels connection)"
                         [System.Threading.Thread]::Sleep(500)
                         $sshProc.StandardInput.WriteLine("y")
                         [System.Threading.Thread]::Sleep(1500)
                     } else {
+                        # Empreinte connue : pas de prompt cle, attendre directement l'auth SSH
                         [System.Threading.Thread]::Sleep(1800)
                     }
 
@@ -1151,19 +1326,21 @@ try {
                     $sshProc.StandardInput.WriteLine("exit")
                     $sshProc.StandardInput.Close()
 
-                    if (-not $sshProc.WaitForExit(15000)) { $sshProc.Kill() }
+                    if (-not $sshProc.WaitForExit(20000)) { $sshProc.Kill() }
                     $rawOutput   = $outTask.GetAwaiter().GetResult()
                     $rawStderr   = $errTask.GetAwaiter().GetResult()
                     $sshExitCode = $sshProc.ExitCode
 
-                    # Si "Connection refused" : SSH pas encore dispo (telephone en cours de boot)
-                    # Reessayer apres delai croissant (5s, 10s)
-                    if ($rawStderr -match 'Connection refused|Network error') {
-                        Write-Log "SSH tentative $attempt/$maxAttempts echouee (Connection refused) — attente avant retry"
-                        if ($attempt -lt $maxAttempts) { [System.Threading.Thread]::Sleep(5000 * $attempt) }
-                    } else {
-                        break
+                    # Mismatch de cle : essayer la variante suivante (cle tournee apres keyscan)
+                    if ($rawStderr -match "doesn't match|server's host key|wrong key|key exchange|DIFFERENT|not valid format") {
+                        Write-Log "SSH $sshIp : rejet cle detecte ($($plinkVariant.label)) — tentative suivante"
+                        $newSshHostKey = $null   # invalider la cle decouverte
+                        continue
                     }
+                    # Connexion refusee : inutile de retenter
+                    if ($rawStderr -match 'Connection refused|Network error') { break }
+                    # Sortie non vide : succes
+                    if (-not [string]::IsNullOrWhiteSpace($rawOutput)) { break }
                 }
 
                 # Clean ANSI sequences and control characters
@@ -1192,25 +1369,39 @@ try {
 
                 if ([string]::IsNullOrWhiteSpace($outputStr)) {
                     $stderrClean = $rawStderr.Trim()
-                    # Retourner connectionRefused:true pour que le client puisse forcer un refresh IP et reessayer
+                    # Connection refused (ne devrait pas arriver ici grace au pre-check TCP, mais securite)
                     if ($stderrClean -match 'Connection refused|Network error') {
                         Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
-                            ok               = $false
+                            ok                = $false
                             connectionRefused = $true
-                            error            = "SSH echec : connexion refusee sur $([string]$body.ip) (port 22 ferme ou SSH desactive). L'IP du telephone a peut-etre change apres le reboot."
+                            error             = "SSH echec : connexion refusee sur $sshIp (port 22 ferme ou SSH desactive)."
                         }
                         continue
                     }
-                    if (-not [string]::IsNullOrWhiteSpace($stderrClean)) {
-                        throw "SSH echec (plink): $stderrClean"
+                    # Mismatch de cle irresolu
+                    if ($stderrClean -match "doesn't match|server's host key|wrong key|DIFFERENT") {
+                        Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
+                            ok           = $false
+                            keyMismatch  = $true
+                            error        = "SSH echec : la cle SSH du telephone a change (changement de cluster ?). Effacez le champ 'sshHostKey' dans phones.json pour ce telephone et reessayez. stderr: $stderrClean"
+                        }
+                        continue
                     }
-                    throw "SSH failed: no response from phone. Check IP, credentials and that SSH is enabled."
+                    # Retourner le raw output + stderr pour faciliter le diagnostic
+                    $debugInfo = ""
+                    if ($stderrClean)  { $debugInfo += "STDERR: $stderrClean`n" }
+                    if ($sshBanner)    { $debugInfo += "BANNER: $sshBanner`n" }
+                    $rawClean = ($cleanOutput -split '\n' | Where-Object { $_.Trim() } | Select-Object -First 10) -join " | "
+                    if ($rawClean)     { $debugInfo += "STDOUT(10 lignes): $rawClean" }
+                    Write-Log "SSH $sshIp : no response — $debugInfo"
+                    throw "SSH echec: aucune sortie recue. IP=$sshIp banner=$sshBanner. $debugInfo"
                 }
 
                 Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
-                    ok       = $true
-                    output   = $outputStr.Trim()
-                    exitCode = $sshExitCode
+                    ok             = $true
+                    output         = $outputStr.Trim()
+                    exitCode       = $sshExitCode
+                    newSshHostKey  = $newSshHostKey
                 }
                 continue
             }
