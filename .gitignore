@@ -11,3 +11,6 @@ $env:TEMP/axl_*.txt
 # Installateurs téléchargés
 *-installer.exe
 
+# Dossier de sortie Inno Setup
+installer-output/
+
