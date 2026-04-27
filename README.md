@@ -12,7 +12,7 @@ Local web application to control **Cisco IP Phone 8800 series** phones and manag
 
 | Tab | Description |
 |-----|-------------|
-| **Controller** | Multi-panel workspace — open one panel per phone simultaneously. Each panel: screenshot, auto-refresh, full keypad, SSH diagnostics. Panels are draggable and resizable. |
+| **Controller** | Multi-panel workspace — open one panel per phone simultaneously. Each panel: screenshot, auto-refresh, full keypad (incl. Services, Directory, Messages, Contacts, Applications, Settings), SSH diagnostics. Panels are draggable and resizable. IP auto-refreshed via AXL before each screenshot (60 s throttle) and before each SSH command. |
 | **AXL / CUCM** | Lists all CUCM phones with real-time IP and registration status, one-click provisioning |
 
 ---
@@ -262,9 +262,9 @@ The server exposes the following endpoints on `http://localhost:8084`:
 | Method | Route | Description |
 |--------|-------|-------------|
 | `GET` | `/api/phones` | Lists phones from `phones.json` |
-| `POST` | `/api/phones/add` | Adds a phone to `phones.json` |
+| `POST` | `/api/phones/add` | Adds or updates a phone in `phones.json` |
 | `POST` | `/api/execute` | Sends a command to a phone |
-| `GET` | `/api/phone/ssh` | Executes an SSH command on a phone |
+| `POST` | `/api/phone/ssh` | Executes an SSH command on a phone |
 
 #### Modes for `/api/execute`
 
@@ -358,6 +358,17 @@ Invoke-WebRequest -Uri "http://192.168.1.50/CGI/Execute" -Method POST `
   -Headers @{Authorization="Basic $creds"} -Body $body `
   -ContentType "application/x-www-form-urlencoded" -UseBasicParsing
 ```
+
+### SSH returns "Connection refused"
+
+This usually means the phone's IP changed after a reboot (DHCP). The application handles this automatically:
+1. Before each SSH command, it queries RisPort70 for the current IP
+2. If "Connection refused" is returned, it forces a new IP refresh via AXL and retries once
+
+If the issue persists:
+- Verify SSH is enabled on the phone (see [CUCM section](#5-enable-ssh-on-phones))
+- Verify AXL credentials are filled in the **AXL / CUCM** tab (required for IP resolution)
+- Run provisioning again via the **🎮 Control** button to re-enable SSH
 
 ### AXL tab does not work
 

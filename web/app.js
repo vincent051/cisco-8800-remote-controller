@@ -130,15 +130,23 @@ function buildPanelHtml(id, phone) {
             '<button data-key="0" class="kbtn knum">0</button>',
             '<button data-key="#" class="kbtn knum">#</button>',
           '</div>',
-        '</div>',
-        '<div class="pp-audio-call">',
-          '<button data-key="Speaker" class="kbtn kaudio">🔊</button>',
-          '<button data-key="Headset" class="kbtn kaudio">🎧</button>',
-          '<button data-key="Mute"    class="kbtn kaudio">🔇</button>',
-          '<button data-key="VolUp"   class="kbtn kaudio">Vol+</button>',
-          '<button data-key="VolDwn"  class="kbtn kaudio">Vol−</button>',
-          '<button data-key="Hangup"  class="kbtn kdanger">📵</button>',
-          '<button data-key="Back"    class="kbtn kapp">⌫</button>',
+          '<div class="pp-audio-call">',
+            '<button data-key="Speaker" class="kbtn kaudio">🔊</button>',
+            '<button data-key="Headset" class="kbtn kaudio">🎧</button>',
+            '<button data-key="Mute"    class="kbtn kaudio">🔇</button>',
+            '<button data-key="VolUp"   class="kbtn kaudio">Vol+</button>',
+            '<button data-key="VolDwn"  class="kbtn kaudio">Vol−</button>',
+            '<button data-key="Hangup"  class="kbtn kdanger">📵</button>',
+            '<button data-key="Back"    class="kbtn kapp">⌫</button>',
+          '</div>',
+          '<div class="pp-func-btns">',
+            '<button data-key="Services"     class="kbtn kfunc">Serv.</button>',
+            '<button data-key="Directory"    class="kbtn kfunc">Dir.</button>',
+            '<button data-key="Messages"     class="kbtn kfunc">Msg</button>',
+            '<button data-key="Contacts"     class="kbtn kfunc">Cont.</button>',
+            '<button data-key="Applications" class="kbtn kfunc">Apps</button>',
+            '<button data-key="Settings"     class="kbtn kfunc">Sett.</button>',
+          '</div>',
         '</div>',
       '</div>',
       '<div class="pp-dial-row">',
@@ -200,8 +208,14 @@ function addPanelLog(id, message) {
   addLog((st.phone.name || id) + ": " + message);
 }
 
-function refreshPanelScreenshot(id) {
+async function refreshPanelScreenshot(id) {
   var st = panels[id]; if (!st) return;
+  // Rafraîchir l'IP via AXL si elle date de plus de 60s (throttle pour ne pas surcharger CUCM)
+  var now = Date.now();
+  if (st.phone.sep && now - st.lastIpRefresh > 60000) {
+    st.lastIpRefresh = now;
+    await refreshPanelIp(id, true);
+  }
   var phone = st.phone;
   var url = "/api/screenshot?ip=" + encodeURIComponent(phone.ip)
     + "&username=" + encodeURIComponent(phone.username || "")
@@ -217,6 +231,15 @@ function scheduleRefresh(id) {
     st.autoRefresh = false;
     st.dom.btnAr.classList.remove("pp-ar-on");
     setPanelStatus(id, "Auto-refresh stopped — check credentials.", false);
+    return;
+  }
+  // Après 3 échecs consécutifs : tenter une mise à jour de l'IP via AXL avant de réessayer
+  if (st.failCount === 3) {
+    st.refreshTimer = setTimeout(async function() {
+      var newIp = await refreshPanelIp(id, true);
+      if (newIp) setPanelStatus(id, "IP mise à jour : " + newIp + " — reconnexion…", true);
+      refreshPanelScreenshot(id);
+    }, 3000);
     return;
   }
   var delay = st.failCount > 0 ? Math.min(1000 + st.failCount * 3000, 15000) : 1000;
@@ -314,31 +337,114 @@ async function runPanelSsh(id, command) {
   }
   var wasAr = st.autoRefresh;
   st.autoRefresh = false;
-  sshOut.textContent = "Running\u2026";
+  sshOut.textContent = "Résolution IP…";
+  // Mettre à jour l'IP avant chaque commande SSH (le téléphone peut avoir changé d'adresse)
+  await refreshPanelIp(id, true);
+
+  var sshAttempt = 0;
+  var sshMaxAttempts = 2;
+  while (sshAttempt < sshMaxAttempts) {
+    sshAttempt++;
+    sshOut.textContent = (sshAttempt > 1 ? "[Retry " + sshAttempt + "/" + sshMaxAttempts + "] " : "") + "Running\u2026";
+    try {
+      var res = await fetch("/api/phone/ssh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ip:          phone.ip,
+          sshUser:     phone.sshUser || "",
+          sshPass:     phone.sshPass || "",
+          sshHostKey:  phone.sshHostKey || "",
+          consoleUser: phone.consoleUser || "",
+          consolePass: phone.consolePass || "",
+          command:     command
+        })
+      });
+      var data = await res.json();
+      // Connection refused : forcer refresh IP et retenter une fois
+      if (!data.ok && data.connectionRefused && sshAttempt < sshMaxAttempts) {
+        addPanelLog(id, "SSH: connexion refusée sur " + phone.ip + " — refresh IP forcé avant retry");
+        sshOut.textContent = "Connexion refusée, mise à jour IP via AXL\u2026";
+        st.lastIpRefresh = 0;
+        await refreshPanelIp(id, false);
+        continue;
+      }
+      if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
+      sshOut.textContent = data.output || "(no output)";
+      addPanelLog(id, "SSH: " + command);
+      break;
+    } catch (err) {
+      sshOut.textContent = "Error: " + err.message;
+      addPanelLog(id, "SSH: " + command + " \u2192 FAILED");
+      break;
+    }
+  }
+
+  st.autoRefresh = wasAr;
+  if (wasAr) setTimeout(function() { refreshPanelScreenshot(id); }, 400);
+}
+
+// ---- Résolution IP en temps réel via AXL/RisPort70 ----
+async function refreshPanelIp(id, silent) {
+  var st = panels[id]; if (!st) return null;
+  var phone = st.phone;
+  if (!phone.sep) {
+    if (!silent) addPanelLog(id, "Résolution IP impossible : SEP inconnu.");
+    return null;
+  }
+  var axlCreds = axlGetCreds();
+  if (!axlCreds.cucm || !axlCreds.username) {
+    if (!silent) addPanelLog(id, "Résolution IP impossible : credentials AXL non configurés.");
+    return null;
+  }
+  if (!silent) setPanelStatus(id, "Résolution IP via AXL…");
   try {
-    var res = await fetch("/api/phone/ssh", {
+    var version = axlCreds.axlVersion;
+    if (version === "auto") version = await axlDetectVersion(axlCreds);
+    var res = await fetch("/api/axl/phoneip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ip:          phone.ip,
-        sshUser:     phone.sshUser || "",
-        sshPass:     phone.sshPass || "",
-        sshHostKey:  phone.sshHostKey || "",
-        consoleUser: phone.consoleUser || "",
-        consolePass: phone.consolePass || "",
-        command:     command
+        cucm: axlCreds.cucm, username: axlCreds.username, password: axlCreds.password,
+        axlVersion: version, sep: phone.sep
       })
     });
     var data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || "HTTP " + res.status);
-    sshOut.textContent = data.output || "(no output)";
-    addPanelLog(id, "SSH: " + command);
+    if (data.ok && data.ip) {
+      var newIp = data.ip;
+      if (newIp !== phone.ip) {
+        var oldIp = phone.ip;
+        phone.ip = newIp;
+        // Mettre à jour l'affichage
+        var ipSpan = st.dom.panel.querySelector(".pp-ip");
+        if (ipSpan) ipSpan.textContent = newIp;
+        // Persister dans phones.json
+        await fetch("/api/phones/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sep: phone.sep, ip: newIp,
+            name: phone.name || phone.sep, description: phone.description || "",
+            username: phone.username || "", password: phone.password || "",
+            sshUser: phone.sshUser || "", sshPass: phone.sshPass || "",
+            sshHostKey: phone.sshHostKey || "", consoleUser: phone.consoleUser || "", consolePass: phone.consolePass || ""
+          })
+        });
+        addPanelLog(id, "IP mise à jour : " + oldIp + " → " + newIp);
+        setPanelStatus(id, "IP mise à jour : " + newIp, true);
+      } else {
+        if (!silent) { addPanelLog(id, "IP inchangée : " + newIp); setPanelStatus(id, "IP OK : " + newIp, true); }
+      }
+      return newIp;
+    } else if (data.notRegistered) {
+      if (!silent) { addPanelLog(id, phone.sep + " non enregistré sur CUCM."); setPanelStatus(id, "Non enregistré", false); }
+      return null;
+    } else {
+      throw new Error(data.error || "Erreur AXL");
+    }
   } catch (err) {
-    sshOut.textContent = "Error: " + err.message;
-    addPanelLog(id, "SSH: " + command + " \u2192 FAILED");
-  } finally {
-    st.autoRefresh = wasAr;
-    if (wasAr) setTimeout(function() { refreshPanelScreenshot(id); }, 400);
+    if (!silent) { addPanelLog(id, "Refresh IP échoué : " + err.message); setPanelStatus(id, "Refresh IP : " + err.message, false); }
+    return null;
   }
 }
 
@@ -406,6 +512,7 @@ function createPhonePanel(phone) {
     id: id, phone: phone,
     autoRefresh: false, failCount: 0,
     keyQueue: [], keyTimer: null, refreshTimer: null,
+    lastIpRefresh: 0,
     dom: {}
   };
   panels[id] = st;
@@ -610,6 +717,34 @@ async function switchToControllerWithPhone(sepName) {
   document.getElementById("tab-controller").classList.add("active");
 
   if (phone) {
+    // Résoudre l'IP courante via AXL si les credentials sont configurés (phone peut avoir changé d'IP)
+    var axlC = axlGetCreds();
+    if (phone.sep && axlC.cucm && axlC.username) {
+      try {
+        var version = axlC.axlVersion === "auto" ? await axlDetectVersion(axlC) : axlC.axlVersion;
+        var ipRes = await fetch("/api/axl/phoneip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cucm: axlC.cucm, username: axlC.username, password: axlC.password, axlVersion: version, sep: phone.sep })
+        });
+        var ipData = await ipRes.json();
+        if (ipData.ok && ipData.ip && ipData.ip !== phone.ip) {
+          addLog(sepName + " : IP mise à jour " + phone.ip + " → " + ipData.ip);
+          phone.ip = ipData.ip;
+          await fetch("/api/phones/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sep: phone.sep, ip: phone.ip,
+              name: phone.name || phone.sep, description: phone.description || "",
+              username: phone.username || "", password: phone.password || "",
+              sshUser: phone.sshUser || "", sshPass: phone.sshPass || "",
+              sshHostKey: phone.sshHostKey || "", consoleUser: phone.consoleUser || "", consolePass: phone.consolePass || ""
+            })
+          });
+        }
+      } catch (e) { /* résolution silencieuse — utiliser l'IP stockée si échec */ }
+    }
     var pid = createPhonePanel(phone);
     setPanelAutoRefresh(pid, true);
     addLog("Controlling " + sepName + " (" + phone.ip + ")");
@@ -817,6 +952,14 @@ async function axlListPhones() {
     axlAllPhones = Array.isArray(rawPhones) ? rawPhones : (rawPhones ? [rawPhones] : []);
     axlApplyFilters(creds);
     axlSetStatus(axlAllPhones.length + " phone(s) found.", true);
+    // Mettre à jour l'IP des panneaux ouverts après chaque listing AXL
+    Object.keys(panels).forEach(function(pid) {
+      var pst = panels[pid];
+      if (pst && pst.phone && pst.phone.sep) {
+        pst.lastIpRefresh = 0; // forcer le refresh au prochain screenshot
+        refreshPanelIp(pid, true);
+      }
+    });
   } catch (err) {
     axlSetStatus("Error: " + err.message, false);
   } finally {

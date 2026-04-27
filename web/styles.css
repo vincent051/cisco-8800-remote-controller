@@ -364,17 +364,31 @@ main {
   aspect-ratio: 1;
 }
 .pp-audio-call {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 4px;
-  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  flex: 0 0 auto;
+  align-content: start;
 }
 .pp-audio-call .kbtn {
-  flex: 1 1 auto;
-  min-width: 44px;
-  padding: 5px 4px;
+  width: 100% !important;
+  padding: 4px 5px;
   font-size: 0.72rem;
+  min-width: unset;
+  text-align: center;
+}
+.pp-func-btns {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  flex: 0 0 auto;
+  align-content: start;
+}
+.pp-func-btns .kbtn {
+  width: 100% !important;
+  padding: 4px 5px;
+  font-size: 0.72rem;
+  min-width: unset;
   text-align: center;
 }
 .pp-keypad {
@@ -887,6 +901,7 @@ button:active { transform: scale(0.97); }
 .kdanger { background: var(--red); }
 .kaudio  { background: #2d6a9f; }
 .kapp    { background: #3a4a5c; }
+.kfunc   { background: #2a5a3a; }
 .knum    { background: var(--dark); font-size: 0.9rem; min-width: 46px; }
 .kline   { background: var(--green); color: #fff; }
 

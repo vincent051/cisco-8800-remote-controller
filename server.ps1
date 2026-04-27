@@ -542,7 +542,7 @@ function Add-AxlDeviceToUser {
 }
 
 $listener = [System.Net.HttpListener]::new()
-$prefix = "http://localhost:$Port/"
+$prefix = "http://+:$Port/"
 $listener.Prefixes.Add($prefix)
 try {
     $listener.Start()
@@ -1098,45 +1098,73 @@ try {
                 if ([string]::IsNullOrWhiteSpace($body.consolePass)) { throw "Field 'consolePass' is required." }
                 if ([string]::IsNullOrWhiteSpace($body.command))     { throw "Field 'command' is required." }
 
-                # SSH connection to Cisco 8800: without PTY (-batch), the phone presents a serial console
-                # Sequence: SSH(post/postpost) -> serial console(debug/debug) -> command -> exit
-                $plinkArgs = "-ssh -batch -l $([string]$body.sshUser) -pw $([string]$body.sshPass)"
+                # SSH connection to Cisco 8800: without PTY, the phone presents a serial console
+                # Sequence: SSH(sshUser/sshPass) -> [y si cle inconnue] -> serial console(consoleUser/consolePass) -> command -> exit
+                # Si sshHostKey connu : utiliser -batch -hostkey (connexion immediate, sans prompt)
+                # Si sshHostKey absent  : ne pas utiliser -batch pour pouvoir repondre "y" au prompt cle via stdin
+                $acceptKeyViaStdin = $false
                 if (-not [string]::IsNullOrWhiteSpace($body.sshHostKey)) {
-                    # Cle connue : utiliser -hostkey pour eviter le prompt (mode -batch strict)
-                    $plinkArgs += " -hostkey `"$([string]$body.sshHostKey)`""
+                    $plinkArgs = "-ssh -batch -hostkey `"$([string]$body.sshHostKey)`" -l $([string]$body.sshUser) -pw $([string]$body.sshPass)"
+                } else {
+                    $plinkArgs = "-ssh -l $([string]$body.sshUser) -pw $([string]$body.sshPass)"
+                    $acceptKeyViaStdin = $true
                 }
-                # If sshHostKey is empty: use PuTTY registry cache (HKCU\Software\SimonTatham\PuTTY\SshHostKeys)
-                # In -batch mode, plink fails if key is not cached -> clear error message returned
                 $plinkArgs += " $([string]$body.ip)"
 
-                $psi = New-Object System.Diagnostics.ProcessStartInfo
-                $psi.FileName = "plink"
-                $psi.Arguments = $plinkArgs
-                $psi.RedirectStandardInput  = $true
-                $psi.RedirectStandardOutput = $true
-                $psi.RedirectStandardError  = $true
-                $psi.UseShellExecute        = $false
-                $psi.CreateNoWindow         = $true
+                Write-Log "SSH $($body.ip) : $($body.command) [hostkey=$(if($body.sshHostKey){'connu'}else{'inconnu'})]"
 
-                Write-Log "SSH $($body.ip) : $($body.command)"
-                $sshProc = [System.Diagnostics.Process]::Start($psi)
-                $outTask = $sshProc.StandardOutput.ReadToEndAsync()
+                $rawOutput = ""; $rawStderr = ""; $sshExitCode = -1
+                $maxAttempts = 3
 
-                # Wait for serial console login prompt
-                [System.Threading.Thread]::Sleep(1800)
-                $sshProc.StandardInput.WriteLine([string]$body.consoleUser)
-                [System.Threading.Thread]::Sleep(1200)
-                $sshProc.StandardInput.WriteLine([string]$body.consolePass)
-                # Wait for DEBUG> prompt
-                [System.Threading.Thread]::Sleep(2500)
-                $sshProc.StandardInput.WriteLine([string]$body.command)
-                # Wait for command output
-                [System.Threading.Thread]::Sleep(4000)
-                $sshProc.StandardInput.WriteLine("exit")
-                $sshProc.StandardInput.Close()
+                for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+                    $psi = New-Object System.Diagnostics.ProcessStartInfo
+                    $psi.FileName        = "plink"
+                    $psi.Arguments       = $plinkArgs
+                    $psi.RedirectStandardInput  = $true
+                    $psi.RedirectStandardOutput = $true
+                    $psi.RedirectStandardError  = $true
+                    $psi.UseShellExecute        = $false
+                    $psi.CreateNoWindow         = $true
 
-                if (-not $sshProc.WaitForExit(15000)) { $sshProc.Kill() }
-                $rawOutput = $outTask.GetAwaiter().GetResult()
+                    $sshProc = [System.Diagnostics.Process]::Start($psi)
+                    $outTask = $sshProc.StandardOutput.ReadToEndAsync()
+                    $errTask = $sshProc.StandardError.ReadToEndAsync()
+
+                    # Forcer LF uniquement — la console serie Cisco 8800 interprete \r comme
+                    # un caractere supplementaire dans le mot de passe (authentification echoue avec \r\n)
+                    $sshProc.StandardInput.NewLine = "`n"
+
+                    if ($acceptKeyViaStdin) {
+                        [System.Threading.Thread]::Sleep(500)
+                        $sshProc.StandardInput.WriteLine("y")
+                        [System.Threading.Thread]::Sleep(1500)
+                    } else {
+                        [System.Threading.Thread]::Sleep(1800)
+                    }
+
+                    $sshProc.StandardInput.WriteLine([string]$body.consoleUser)
+                    [System.Threading.Thread]::Sleep(1200)
+                    $sshProc.StandardInput.WriteLine([string]$body.consolePass)
+                    [System.Threading.Thread]::Sleep(3000)
+                    $sshProc.StandardInput.WriteLine([string]$body.command)
+                    [System.Threading.Thread]::Sleep(5000)
+                    $sshProc.StandardInput.WriteLine("exit")
+                    $sshProc.StandardInput.Close()
+
+                    if (-not $sshProc.WaitForExit(15000)) { $sshProc.Kill() }
+                    $rawOutput   = $outTask.GetAwaiter().GetResult()
+                    $rawStderr   = $errTask.GetAwaiter().GetResult()
+                    $sshExitCode = $sshProc.ExitCode
+
+                    # Si "Connection refused" : SSH pas encore dispo (telephone en cours de boot)
+                    # Reessayer apres delai croissant (5s, 10s)
+                    if ($rawStderr -match 'Connection refused|Network error') {
+                        Write-Log "SSH tentative $attempt/$maxAttempts echouee (Connection refused) — attente avant retry"
+                        if ($attempt -lt $maxAttempts) { [System.Threading.Thread]::Sleep(5000 * $attempt) }
+                    } else {
+                        break
+                    }
+                }
 
                 # Clean ANSI sequences and control characters
                 $cleanOutput = [regex]::Replace($rawOutput, '(\x1B\[[0-9;]*[A-Za-z]|\x1B[()][A-Z0-9]|\r|\x00)', '')
@@ -1157,19 +1185,32 @@ try {
                 }
 
                 $outputStr = ($resultLines | Where-Object { $_ -ne "" }) -join "`n"
-        # If extraction fails (echo not found), return raw cleaned output
+                # If extraction fails (echo not found), return raw cleaned output
                 if ([string]::IsNullOrWhiteSpace($outputStr)) {
                     $outputStr = ($cleanOutput -split '\n' | Where-Object { $_.Trim() }) -join "`n"
                 }
 
                 if ([string]::IsNullOrWhiteSpace($outputStr)) {
+                    $stderrClean = $rawStderr.Trim()
+                    # Retourner connectionRefused:true pour que le client puisse forcer un refresh IP et reessayer
+                    if ($stderrClean -match 'Connection refused|Network error') {
+                        Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
+                            ok               = $false
+                            connectionRefused = $true
+                            error            = "SSH echec : connexion refusee sur $([string]$body.ip) (port 22 ferme ou SSH desactive). L'IP du telephone a peut-etre change apres le reboot."
+                        }
+                        continue
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($stderrClean)) {
+                        throw "SSH echec (plink): $stderrClean"
+                    }
                     throw "SSH failed: no response from phone. Check IP, credentials and that SSH is enabled."
                 }
 
                 Write-JsonResponse -Response $response -StatusCode 200 -Payload @{
                     ok       = $true
                     output   = $outputStr.Trim()
-                    exitCode = $sshProc.ExitCode
+                    exitCode = $sshExitCode
                 }
                 continue
             }
