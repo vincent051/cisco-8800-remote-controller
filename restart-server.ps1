@@ -1,5 +1,6 @@
-﻿$port = 8084
-$script = "c:\Users\deepadm\Documents\vsc\server.ps1"
+﻿param([int]$Port = 8084)
+$port = $Port
+$script = Join-Path $PSScriptRoot "server.ps1"
 
 # 1. Stopper les jobs PowerShell
 Get-Job | Stop-Job -PassThru | Remove-Job -Force
