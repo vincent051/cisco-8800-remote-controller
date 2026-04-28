@@ -542,14 +542,27 @@ function Add-AxlDeviceToUser {
 }
 
 $listener = [System.Net.HttpListener]::new()
-$prefix = "http://+:$Port/"
-$listener.Prefixes.Add($prefix)
+# Essayer localhost d abord (pas d ACL necessaire sur installation fraiche)
+# Si echec (ACL http://+:Port/ deja enregistree), utiliser http://+:Port/
+$prefixLocal = "http://localhost:$Port/"
+$prefixAll   = "http://+:$Port/"
+$prefix = $prefixLocal
+$listener.Prefixes.Add($prefixLocal)
 try {
     $listener.Start()
 } catch {
-    Write-Host "Error starting on port $Port : $($_.Exception.Message)"
-    Write-Host "Tip: check that no other instance is running on this port."
-    exit 1
+    Write-Log "localhost echec ($($_.Exception.Message)) — essai http://+:$Port/..."
+    $listener = [System.Net.HttpListener]::new()
+    $listener.Prefixes.Add($prefixAll)
+    try {
+        $listener.Start()
+        $prefix = $prefixAll
+    } catch {
+        Write-Host "Erreur demarrage port $Port : $($_.Exception.Message)"
+        Write-Host "Conseil : verifier qu aucune autre instance ne tourne sur ce port."
+        Write-Host "         ou enregistrer l ACL : netsh http add urlacl url=http://+:$Port/ user=Everyone (admin requis)"
+        exit 1
+    }
 }
 
 Write-Log "Cisco 8800 Controller listening on $prefix"
