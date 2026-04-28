@@ -59,7 +59,7 @@ Source: "{#SourceDir}\cucm-connections.json"; DestDir: "{app}"; Flags: onlyifdoe
 ; Raccourci Start Menu
 Name: "{group}\{#AppName}"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\launch.ps1"""; WorkingDir: "{app}"; Comment: "Lance le controleur Cisco 8800 et ouvre le navigateur"
 ; Raccourci "Arreter le serveur"
-Name: "{group}\Arreter le serveur"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""Get-NetTCPConnection -LocalPort 8084 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Write-Host 'Serveur arrete.'"""; WorkingDir: "{app}"
+Name: "{group}\Arreter le serveur"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""Get-NetTCPConnection -LocalPort 8084 -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}; Write-Host 'Serveur arrete.'"""; WorkingDir: "{app}"
 ; Desinstallation
 Name: "{group}\Desinstaller {#AppName}"; Filename: "{uninstallexe}"
 ; Bureau (optionnel)
@@ -73,7 +73,7 @@ Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -WindowStyle Hi
 
 [UninstallRun]
 ; Arreter le serveur avant desinstallation
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""Get-NetTCPConnection -LocalPort 8084 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"""; RunOnceId: "StopServer"; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command ""Get-NetTCPConnection -LocalPort 8084 -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}"""; RunOnceId: "StopServer"; Flags: runhidden waituntilterminated
 
 [UninstallDelete]
 ; Supprimer les fichiers generes (logs, temp) mais PAS phones.json ni cucm-connections.json

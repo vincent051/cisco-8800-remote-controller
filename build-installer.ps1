@@ -33,7 +33,8 @@ $outDir  = Join-Path $PSScriptRoot "installer-output"
 $isccPaths = @(
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
     "C:\Program Files\Inno Setup 6\ISCC.exe",
-    "C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
+    "C:\Program Files (x86)\Inno Setup 5\ISCC.exe",
+    "$env:USERPROFILE\scoop\apps\inno-setup\current\ISCC.exe"
 )
 $isccExe = $isccPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 
